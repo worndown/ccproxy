@@ -25,32 +25,50 @@ public static class AnthropicToOpenAI
         };
 
         // max_tokens -> max_output_tokens
-        if (anthropicRequest["max_tokens"] is JsonNode maxTokens)
-            result["max_output_tokens"] = maxTokens.DeepClone();
+        if (anthropicRequest["max_tokens"] is { } maxTokens)
+        {
+            // Claude Code can set max tokens to 1 when sending first, test message.
+            // OpenAI requires max_output_tokens to be >= 16; otherwise request will fail.
+            int tokenValue = maxTokens.GetValue<int>();
+            result["max_output_tokens"] = Math.Max(tokenValue, 16);
+        }
 
         // temperature, top_p pass through
-        if (anthropicRequest["temperature"] is JsonNode temp)
+        if (anthropicRequest["temperature"] is { } temp)
+        {
             result["temperature"] = temp.DeepClone();
-        if (anthropicRequest["top_p"] is JsonNode topP)
+        }
+
+        if (anthropicRequest["top_p"] is { } topP)
+        {
             result["top_p"] = topP.DeepClone();
+        }
 
         // system -> instructions
-        if (anthropicRequest["system"] is JsonNode system)
+        if (anthropicRequest["system"] is { } system)
+        {
             result["instructions"] = ConvertSystem(system);
+        }
 
         // messages -> input
         result["input"] = ConvertMessages(anthropicRequest["messages"]?.AsArray());
 
         // tools
-        if (anthropicRequest["tools"] is JsonArray tools && tools.Count > 0)
+        if (anthropicRequest["tools"] is JsonArray { Count: > 0 } tools)
+        {
             result["tools"] = ConvertTools(tools);
+        }
 
         // tool_choice
-        if (anthropicRequest["tool_choice"] is JsonNode toolChoice)
+        if (anthropicRequest["tool_choice"] is { } toolChoice)
+        {
             result["tool_choice"] = ConvertToolChoice(toolChoice);
+        }
 
         if (stream)
+        {
             result["stream"] = true;
+        }
 
         return result;
     }
@@ -59,34 +77,51 @@ public static class AnthropicToOpenAI
     {
         if (system is JsonArray arr)
         {
-            var parts = new List<string>();
-            foreach (var item in arr)
+            List<string> parts = new List<string>();
+            foreach (JsonNode? item in arr)
             {
-                if (item?["text"] is JsonNode text)
+                if (item?["text"] is { } text)
+                {
                     parts.Add(text.GetValue<string>());
+                }
                 else if (item is JsonValue val)
+                {
                     parts.Add(val.GetValue<string>());
+                }
             }
             return string.Join("\n", parts);
         }
+
         return system.GetValue<string>();
     }
 
     private static JsonArray ConvertMessages(JsonArray? messages)
     {
-        var input = new JsonArray();
-        if (messages == null) return input;
+        JsonArray input = new JsonArray();
 
-        foreach (var msg in messages)
+        if (messages == null)
         {
-            if (msg == null) continue;
-            var role = msg["role"]?.GetValue<string>();
-            var content = msg["content"];
+            return input;
+        }
+
+        foreach (JsonNode? msg in messages)
+        {
+            if (msg == null)
+            {
+                continue;
+            }
+
+            string? role = msg["role"]?.GetValue<string>();
+            JsonNode? content = msg["content"];
 
             if (role == "user")
+            {
                 ConvertUserMessage(content, input);
+            }
             else if (role == "assistant")
+            {
                 ConvertAssistantMessage(content, input);
+            }
         }
 
         return input;
@@ -103,17 +138,22 @@ public static class AnthropicToOpenAI
                 ["role"] = "user",
                 ["content"] = textVal.DeepClone()
             });
+
             return;
         }
 
         if (content is JsonArray contentArray)
         {
             // Process content blocks - separate tool_results from text/image content
-            var messageContent = new JsonArray();
-            foreach (var block in contentArray)
+            JsonArray messageContent = new JsonArray();
+            foreach (JsonNode? block in contentArray)
             {
-                if (block == null) continue;
-                var type = block["type"]?.GetValue<string>();
+                if (block == null)
+                {
+                    continue;
+                }
+
+                string? type = block["type"]?.GetValue<string>();
 
                 if (type == "tool_result")
                 {
@@ -130,9 +170,9 @@ public static class AnthropicToOpenAI
                 }
                 else if (type == "image")
                 {
-                    var source = block["source"];
-                    var mediaType = source?["media_type"]?.GetValue<string>() ?? "image/png";
-                    var data = source?["data"]?.GetValue<string>() ?? "";
+                    JsonNode? source = block["source"];
+                    string mediaType = source?["media_type"]?.GetValue<string>() ?? "image/png";
+                    string data = source?["data"]?.GetValue<string>() ?? "";
                     messageContent.Add(new JsonObject
                     {
                         ["type"] = "input_image",
@@ -155,10 +195,10 @@ public static class AnthropicToOpenAI
 
     private static JsonObject ConvertToolResult(JsonNode block)
     {
-        var toolUseId = block["tool_use_id"]?.GetValue<string>() ?? "";
-        var output = ExtractToolResultContent(block["content"]);
+        string toolUseId = block["tool_use_id"]?.GetValue<string>() ?? "";
+        string output = ExtractToolResultContent(block["content"]);
 
-        var result = new JsonObject
+        JsonObject result = new JsonObject
         {
             ["type"] = "function_call_output",
             ["call_id"] = toolUseId,
@@ -170,25 +210,39 @@ public static class AnthropicToOpenAI
 
     private static string ExtractToolResultContent(JsonNode? content)
     {
-        if (content == null) return "";
-        if (content is JsonValue val) return val.GetValue<string>();
+        if (content == null)
+        {
+            return "";
+        }
+
+        if (content is JsonValue val)
+        {
+            return val.GetValue<string>();
+        }
+
         if (content is JsonArray arr)
         {
-            var parts = new List<string>();
+            List<string> parts = new List<string>();
             foreach (var item in arr)
             {
                 if (item?["type"]?.GetValue<string>() == "text")
+                {
                     parts.Add(item["text"]?.GetValue<string>() ?? "");
+                }
                 else if (item?["type"]?.GetValue<string>() == "image")
                 {
                     // For images in tool results, serialize as JSON
                     parts.Add(item.ToJsonString());
                 }
                 else
+                {
                     parts.Add(item?.ToJsonString() ?? "");
+                }
             }
+
             return string.Join("\n", parts);
         }
+
         return content.ToJsonString();
     }
 
@@ -202,18 +256,23 @@ public static class AnthropicToOpenAI
                 ["role"] = "assistant",
                 ["content"] = textVal.DeepClone()
             });
+
             return;
         }
 
         if (content is JsonArray contentArray)
         {
             // Collect text blocks for a single message, emit tool_use as separate items
-            var textParts = new List<string>();
+            List<string> textParts = new List<string>();
 
-            foreach (var block in contentArray)
+            foreach (JsonNode? block in contentArray)
             {
-                if (block == null) continue;
-                var type = block["type"]?.GetValue<string>();
+                if (block == null)
+                {
+                    continue;
+                }
+
+                string? type = block["type"]?.GetValue<string>();
 
                 if (type == "text")
                 {
@@ -230,12 +289,12 @@ public static class AnthropicToOpenAI
                             ["role"] = "assistant",
                             ["content"] = string.Join("", textParts)
                         });
+
                         textParts.Clear();
                     }
 
-                    var arguments = block["input"] is JsonNode inp
-                        ? inp.ToJsonString()
-                        : "{}";
+                    string arguments = block["input"] is { } inp ? inp.ToJsonString() : "{}";
+
                     input.Add(new JsonObject
                     {
                         ["type"] = "function_call",
@@ -261,8 +320,8 @@ public static class AnthropicToOpenAI
 
     private static JsonArray ConvertTools(JsonArray tools)
     {
-        var result = new JsonArray();
-        foreach (var tool in tools)
+        JsonArray result = new JsonArray();
+        foreach (JsonNode? tool in tools)
         {
             if (tool == null) continue;
             result.Add(new JsonObject
@@ -273,12 +332,14 @@ public static class AnthropicToOpenAI
                 ["parameters"] = tool["input_schema"]?.DeepClone()
             });
         }
+
         return result;
     }
 
     private static JsonNode ConvertToolChoice(JsonNode toolChoice)
     {
-        var type = toolChoice["type"]?.GetValue<string>();
+        string? type = toolChoice["type"]?.GetValue<string>();
+
         return type switch
         {
             "auto" => JsonValue.Create("auto"),
