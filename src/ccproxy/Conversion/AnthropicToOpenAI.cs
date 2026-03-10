@@ -19,9 +19,17 @@ public static class AnthropicToOpenAI
     /// <returns>An OpenAI Responses API request as a <see cref="JsonObject"/>.</returns>
     public static JsonObject Convert(JsonNode anthropicRequest, ProxyConfig config, bool stream = false)
     {
-        var result = new JsonObject
+        JsonObject result = new JsonObject
         {
             ["model"] = config.Model,
+        };
+
+        // reasoning -> high
+        // Anthropic uses adaptive and thinking budgets (expressed in tokens).
+        // This doesn't convert to OpenAI models, so we're always using high reasoning effort.
+        result["reasoning"] = new JsonObject
+        {
+            ["effort"] = "high"
         };
 
         // max_tokens -> max_output_tokens

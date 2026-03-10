@@ -22,22 +22,26 @@ public static class OpenAIToAnthropic
     /// <returns>An Anthropic Messages API response as a <see cref="JsonObject"/>.</returns>
     public static JsonObject Convert(JsonNode openAiResponse, ProxyConfig config, string? requestedModel = null)
     {
-        var content = new JsonArray();
-        var hasToolUse = false;
+        JsonArray content = new JsonArray();
+        bool hasToolUse = false;
 
         if (openAiResponse["output"] is JsonArray outputArray)
         {
-            foreach (var item in outputArray)
+            foreach (JsonNode? item in outputArray)
             {
-                if (item == null) continue;
-                var type = item["type"]?.GetValue<string>();
+                if (item == null)
+                {
+                    continue;
+                }
+
+                string? type = item["type"]?.GetValue<string>();
 
                 if (type == "message")
                 {
                     // Extract text content from message output
                     if (item["content"] is JsonArray msgContent)
                     {
-                        foreach (var part in msgContent)
+                        foreach (JsonNode? part in msgContent)
                         {
                             if (part?["type"]?.GetValue<string>() == "output_text")
                             {
@@ -74,14 +78,16 @@ public static class OpenAIToAnthropic
             }
         }
 
-        var stopReason = hasToolUse ? "tool_use" : "end_turn";
-        var status = openAiResponse["status"]?.GetValue<string>();
+        string stopReason = hasToolUse ? "tool_use" : "end_turn";
+        string? status = openAiResponse["status"]?.GetValue<string>();
         if (status == "incomplete")
+        {
             stopReason = "max_tokens";
+        }
 
-        var responseId = $"msg_{Guid.NewGuid():N}";
+        string responseId = $"msg_{Guid.NewGuid():N}";
 
-        var usage = new JsonObject
+        JsonObject usage = new JsonObject
         {
             ["input_tokens"] = openAiResponse["usage"]?["input_tokens"]?.DeepClone() ?? 0,
             ["output_tokens"] = openAiResponse["usage"]?["output_tokens"]?.DeepClone() ?? 0,
