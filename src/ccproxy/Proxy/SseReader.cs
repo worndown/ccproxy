@@ -14,13 +14,13 @@ public static class SseReader
     /// </summary>
     public static async IAsyncEnumerable<SseEvent> ReadEventsAsync(Stream stream, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        using var reader = new StreamReader(stream);
+        using StreamReader reader = new StreamReader(stream);
         string? eventType = null;
         string? data = null;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
+            string? line = await reader.ReadLineAsync(cancellationToken);
             if (line == null) break; // End of stream
 
             if (line.StartsWith("event:"))

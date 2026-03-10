@@ -49,7 +49,7 @@ public static class MessagesEndpoint
             Logger.LogRequest("Anthropic Request", requestBody);
 
             // Validate required fields
-            var maxTokens = requestBody["max_tokens"]?.GetValue<int>() ?? 0;
+            int maxTokens = requestBody["max_tokens"]?.GetValue<int>() ?? 0;
             if (maxTokens <= 0)
             {
                 context.Response.StatusCode = 400;
@@ -57,7 +57,7 @@ public static class MessagesEndpoint
                 return;
             }
 
-            var messages = requestBody["messages"]?.AsArray();
+            JsonArray? messages = requestBody["messages"]?.AsArray();
             if (messages == null || messages.Count == 0)
             {
                 context.Response.StatusCode = 400;
@@ -65,12 +65,12 @@ public static class MessagesEndpoint
                 return;
             }
 
-            var isStreaming = requestBody["stream"]?.GetValue<bool>() ?? false;
-            var requestedModel = requestBody["model"]?.GetValue<string>();
-            var toolCount = requestBody["tools"]?.AsArray()?.Count ?? 0;
-            var messageCount = messages.Count;
-            var summaryStatusCode = 200;
-            var toolUseCount = 0;
+            bool isStreaming = requestBody["stream"]?.GetValue<bool>() ?? false;
+            string? requestedModel = requestBody["model"]?.GetValue<string>();
+            int toolCount = requestBody["tools"]?.AsArray()?.Count ?? 0;
+            int messageCount = messages.Count;
+            int summaryStatusCode = 200;
+            int toolUseCount = 0;
 
             try
             {
@@ -86,7 +86,7 @@ public static class MessagesEndpoint
             catch (OpenAIProxyException ex)
             {
                 Logger.LogError($"Azure API error: {ex.StatusCode} - {ex.ResponseBody}");
-                var (anthropicErrorType, statusCode) = MapErrorStatus(ex.StatusCode);
+                (string anthropicErrorType, int statusCode) = MapErrorStatus(ex.StatusCode);
                 summaryStatusCode = statusCode;
 
                 if (isStreaming && context.Response.HasStarted)
@@ -131,8 +131,8 @@ public static class MessagesEndpoint
 
     private static async Task<int> HandleNonStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
     {
-        var openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: false);
-        var openAiResponse = await proxy.SendRequestAsync(openAiRequest, context.RequestAborted);
+        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: false);
+        JsonNode? openAiResponse = await proxy.SendRequestAsync(openAiRequest, context.RequestAborted);
 
         if (openAiResponse == null)
         {
@@ -141,33 +141,33 @@ public static class MessagesEndpoint
             return 0;
         }
 
-        var anthropicResponse = OpenAIToAnthropic.Convert(openAiResponse, config, requestedModel);
+        JsonObject anthropicResponse = OpenAIToAnthropic.Convert(openAiResponse, config, requestedModel);
         Logger.LogResponse("Anthropic Response", anthropicResponse);
         await context.Response.WriteAsJsonAsync(anthropicResponse);
 
-        var toolUseCount = anthropicResponse["content"]?.AsArray()
+        int? toolUseCount = anthropicResponse["content"]?.AsArray()
             .Count(item => item?["type"]?.GetValue<string>() == "tool_use");
         return toolUseCount ?? 0;
     }
 
     private static async Task<int> HandleStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
     {
-        var openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: true);
-        var (stream, _) = await proxy.SendStreamingRequestAsync(openAiRequest, context.RequestAborted);
+        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: true);
+        (Stream stream, _) = await proxy.SendStreamingRequestAsync(openAiRequest, context.RequestAborted);
 
         context.Response.ContentType = "text/event-stream";
         context.Response.Headers["Cache-Control"] = "no-cache";
         context.Response.Headers["Connection"] = "keep-alive";
 
-        var tracker = new StreamingStateTracker(config, requestedModel);
+        StreamingStateTracker tracker = new StreamingStateTracker(config, requestedModel);
 
         await using (stream)
         {
-            await foreach (var sseEvent in SseReader.ReadEventsAsync(stream, context.RequestAborted))
+            await foreach (SseEvent sseEvent in SseReader.ReadEventsAsync(stream, context.RequestAborted))
             {
                 Logger.LogSseEvent("<<<", sseEvent.EventType, sseEvent.Data);
 
-                foreach (var (eventType, data) in tracker.ProcessEvent(sseEvent))
+                foreach ((string eventType, JsonObject data) in tracker.ProcessEvent(sseEvent))
                 {
                     await WriteSseEvent(context, eventType, data);
                 }
@@ -181,7 +181,7 @@ public static class MessagesEndpoint
 
     private static async Task WriteSseEvent(HttpContext context, string eventType, JsonObject data)
     {
-        var line = $"event: {eventType}\ndata: {data.ToJsonString()}\n\n";
+        string line = $"event: {eventType}\ndata: {data.ToJsonString()}\n\n";
         Logger.LogSseEvent(">>>", eventType, data.ToJsonString());
         await context.Response.WriteAsync(line, context.RequestAborted);
         await context.Response.Body.FlushAsync(context.RequestAborted);

@@ -74,13 +74,23 @@ public class ProxyConfig
     {
         var errors = new List<string>();
         if (string.IsNullOrEmpty(EndpointUrl))
+        {
             errors.Add("Endpoint URL is required (--endpoint or CCPROXY_ENDPOINT_URL)");
+        }
+
         if (string.IsNullOrEmpty(Model))
+        {
             errors.Add("Model is required (--model or CCPROXY_MODEL)");
+        }
+
         if (string.IsNullOrEmpty(ApiKey))
+        {
             errors.Add("API key is required (--key or CCPROXY_API_KEY)");
+        }
 
         if (errors.Count > 0)
+        {
             throw new InvalidOperationException("Configuration errors:\n" + string.Join("\n", errors.Select(e => $"  - {e}")));
+        }
     }
 }
