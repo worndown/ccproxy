@@ -197,6 +197,51 @@ public class StreamingStateTrackerTests
     }
 
     [Fact]
+    public void ProcessEvent_TextThenToolThenText_AssignsDistinctBlockIndices()
+    {
+        var tracker = new StreamingStateTracker(_config);
+
+        // First text block at output_index=0
+        var text1Events = tracker.ProcessEvent(new SseEvent("response.content_part.added", """
+        {
+            "part": {"type": "output_text", "text": ""},
+            "output_index": 0,
+            "content_index": 0
+        }
+        """)).ToList();
+        Assert.Equal(0, text1Events[0].Data["index"]!.GetValue<int>());
+
+        // Function call at output_index=1
+        var toolEvents = tracker.ProcessEvent(new SseEvent("response.output_item.added", """
+        {
+            "item": {"type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "read_file"},
+            "output_index": 1
+        }
+        """)).ToList();
+        Assert.Equal(1, toolEvents[0].Data["index"]!.GetValue<int>());
+
+        // Second text block at output_index=2, content_index=0 (same content_index as first!)
+        var text2Events = tracker.ProcessEvent(new SseEvent("response.content_part.added", """
+        {
+            "part": {"type": "output_text", "text": ""},
+            "output_index": 2,
+            "content_index": 0
+        }
+        """)).ToList();
+        Assert.Equal(2, text2Events[0].Data["index"]!.GetValue<int>());
+
+        // Delta for second text block should route to block index 2, not 0
+        var deltaEvents = tracker.ProcessEvent(new SseEvent("response.output_text.delta", """
+        {
+            "delta": "world",
+            "output_index": 2,
+            "content_index": 0
+        }
+        """)).ToList();
+        Assert.Equal(2, deltaEvents[0].Data["index"]!.GetValue<int>());
+    }
+
+    [Fact]
     public void ProcessEvent_UnknownEvent_ReturnsEmpty()
     {
         var tracker = new StreamingStateTracker(_config);

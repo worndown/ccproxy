@@ -15,6 +15,7 @@ public class StreamingStateTracker
     private readonly ProxyConfig _config;
     private readonly string? _requestedModel;
     private readonly Dictionary<string, int> _outputItemToBlockIndex = new();
+    private readonly Dictionary<(int OutputIndex, int ContentIndex), int> _contentPartToBlockIndex = new();
     private int _contentBlockIndex = 0;
     private bool _hasToolUse = false;
     
@@ -160,8 +161,9 @@ public class StreamingStateTracker
         if (type == "output_text")
         {
             var index = _contentBlockIndex++;
-            // Track by output_index if available
-            var outputIndex = data["output_index"]?.GetValue<int>() ?? -1;
+            var outputIndex = data["output_index"]?.GetValue<int>() ?? 0;
+            var contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
+            _contentPartToBlockIndex[(outputIndex, contentIndex)] = index;
 
             yield return ("content_block_start", new JsonObject
             {
@@ -178,10 +180,6 @@ public class StreamingStateTracker
 
     private JsonObject CreateTextDelta(JsonNode data)
     {
-        // Find the block index for this text delta
-        var contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
-        // For text deltas, the index is based on ordering
-        // We need to find the right block index
         var blockIndex = FindTextBlockIndex(data);
 
         return new JsonObject
@@ -274,18 +272,13 @@ public class StreamingStateTracker
 
     private int FindTextBlockIndex(JsonNode data)
     {
-        // For text content parts, we need to determine which block index they correspond to
-        // The output_index tells us which output item, content_index which content part
-        // For simple cases, we track sequentially
         var outputIndex = data["output_index"]?.GetValue<int>() ?? 0;
         var contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
+        var key = (outputIndex, contentIndex);
 
-        // Build a key and check if we already assigned an index
-        // For text blocks, we assigned indices in HandleContentPartAdded
-        // The block index follows the order of content_block_start emissions
-        // In most cases, text blocks come first, then tool_use blocks
-        // We use a simple heuristic: text blocks are at indices starting from 0
-        // before any tool_use blocks that were added via HandleOutputItemAdded
-        return contentIndex;
+        if (_contentPartToBlockIndex.TryGetValue(key, out var blockIndex))
+            return blockIndex;
+
+        return contentIndex; // fallback for safety
     }
 }
