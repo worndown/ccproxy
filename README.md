@@ -17,7 +17,7 @@ CCProxy accepts configuration via command-line arguments or environment variable
 | `--endpoint`   | `CCPROXY_ENDPOINT_URL` | Azure endpoint base URL                      | —       |
 | `--model`      | `CCPROXY_MODEL`        | Target Azure model deployment name           | —       |
 | `--key`        | `CCPROXY_API_KEY`      | Azure API key                                | —       |
-| `--verbosity`  | —                      | `0` = quiet, `1` = verbose JSON logging      | `0`     |
+| `--logfile`    | —                      | Path to verbose JSON log file (optional)     | —       |
 
 ## Quick Start
 
@@ -57,14 +57,21 @@ Gracefully shuts down the proxy. Returns `{"status":"shutting_down"}`.
 
 ## Diagnostics
 
-Set `--verbosity 1` to enable verbose logging. Request and response JSON payloads are logged to stderr, keeping stdout clean. This is useful for troubleshooting conversion issues.
+Each request produces a concise 2-line summary on stderr:
+
+```
+[ccproxy] POST /v1/messages - 200
+[ccproxy] gpt-5-codex -> 5 tools 2 messages
+```
+
+For full verbose logging (JSON payloads and SSE events), use `--logfile` to write diagnostics to a file:
 
 ```bash
 dotnet run --project src/ccproxy -- \
   --endpoint https://your-resource.openai.azure.com \
   --model gpt-5-codex \
   --key your-api-key \
-  --verbosity 1
+  --logfile debug.log
 ```
 
 ## API Conversion Reference

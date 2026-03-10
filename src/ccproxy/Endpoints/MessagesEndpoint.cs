@@ -67,6 +67,9 @@ public static class MessagesEndpoint
 
             var isStreaming = requestBody["stream"]?.GetValue<bool>() ?? false;
             var requestedModel = requestBody["model"]?.GetValue<string>();
+            var toolCount = requestBody["tools"]?.AsArray()?.Count ?? 0;
+            var messageCount = messages.Count;
+            var summaryStatusCode = 200;
 
             try
             {
@@ -83,6 +86,7 @@ public static class MessagesEndpoint
             {
                 Logger.LogError($"Azure API error: {ex.StatusCode} - {ex.ResponseBody}");
                 var (anthropicErrorType, statusCode) = MapErrorStatus(ex.StatusCode);
+                summaryStatusCode = statusCode;
 
                 if (isStreaming && context.Response.HasStarted)
                 {
@@ -106,14 +110,20 @@ public static class MessagesEndpoint
             catch (HttpRequestException ex)
             {
                 Logger.LogError($"Network error: {ex.Message}");
+                summaryStatusCode = 502;
                 context.Response.StatusCode = 502;
                 await context.Response.WriteAsJsonAsync(CreateError("api_error", $"Failed to connect to Azure endpoint: {ex.Message}"));
             }
             catch (TaskCanceledException)
             {
                 Logger.LogError("Request timed out");
+                summaryStatusCode = 504;
                 context.Response.StatusCode = 504;
                 await context.Response.WriteAsJsonAsync(CreateError("api_error", "Request to Azure endpoint timed out"));
+            }
+            finally
+            {
+                Logger.LogRequestSummary("POST", "/v1/messages", summaryStatusCode, config.Model, toolCount, messageCount);
             }
         });
     }

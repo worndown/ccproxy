@@ -17,12 +17,12 @@ public class ProxyConfig
     /// <summary>Azure API key used for authentication.</summary>
     public string ApiKey { get; set; } = string.Empty;
 
-    /// <summary>Diagnostic verbosity level. 0 = quiet, 1 = verbose JSON logging.</summary>
-    public int Verbosity { get; set; } = 0;
+    /// <summary>Optional log file path for verbose JSON diagnostics. Null = no file logging.</summary>
+    public string? LogFile { get; set; }
 
     /// <summary>
     /// Creates a <see cref="ProxyConfig"/> from command-line arguments and environment variables.
-    /// CLI arguments (<c>--port</c>, <c>--endpoint</c>, <c>--model</c>, <c>--key</c>, <c>--verbosity</c>)
+    /// CLI arguments (<c>--port</c>, <c>--endpoint</c>, <c>--model</c>, <c>--key</c>, <c>--logfile</c>)
     /// take precedence over their corresponding <c>CCPROXY_*</c> environment variables.
     /// </summary>
     public static ProxyConfig FromArgs(string[] args)
@@ -57,9 +57,8 @@ public class ProxyConfig
                 case "--key":
                     config.ApiKey = args[++i];
                     break;
-                case "--verbosity":
-                    if (int.TryParse(args[++i], out var verbosity))
-                        config.Verbosity = verbosity;
+                case "--logfile":
+                    config.LogFile = args[++i];
                     break;
             }
         }

@@ -6,7 +6,7 @@ using CCProxy.Proxy;
 var config = ProxyConfig.FromArgs(args);
 config.Validate();
 
-Logger.Verbose = config.Verbosity > 0;
+Logger.Initialize(config.LogFile);
 
 var builder = WebApplication.CreateBuilder();
 
@@ -27,9 +27,12 @@ ShutdownEndpoint.Map(app);
 Logger.LogInfo($"CCProxy started on http://localhost:{config.Port}");
 Logger.LogInfo($"Target endpoint: {config.EndpointUrl}");
 Logger.LogInfo($"Target model: {config.Model}");
-Logger.LogInfo($"Verbosity: {config.Verbosity}");
+if (config.LogFile != null)
+    Logger.LogInfo($"Log file: {config.LogFile}");
 
 app.Run();
+
+Logger.Shutdown();
 
 // Make Program accessible for WebApplicationFactory in tests
 public partial class Program { }
