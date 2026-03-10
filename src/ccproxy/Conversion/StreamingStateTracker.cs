@@ -11,13 +11,13 @@ namespace CCProxy.Conversion;
 /// </summary>
 public class StreamingStateTracker
 {
-    private readonly string _messageId = $"msg_{Guid.NewGuid():N}";
-    private readonly ProxyConfig _config;
-    private readonly string? _requestedModel;
-    private readonly Dictionary<string, int> _outputItemToBlockIndex = new();
-    private readonly Dictionary<(int OutputIndex, int ContentIndex), int> _contentPartToBlockIndex = new();
-    private int _contentBlockIndex = 0;
-    private bool _hasToolUse = false;
+    private readonly string messageId = $"msg_{Guid.NewGuid():N}";
+    private readonly ProxyConfig config;
+    private readonly string? requestedModel;
+    private readonly Dictionary<string, int> outputItemToBlockIndex = new();
+    private readonly Dictionary<(int OutputIndex, int ContentIndex), int> contentPartToBlockIndex = new();
+    private int contentBlockIndex = 0;
+    private bool hasToolUse = false;
     
 
     /// <summary>
@@ -27,17 +27,17 @@ public class StreamingStateTracker
     /// <param name="requestedModel">Original model name from the Anthropic request, echoed back in <c>message_start</c>.</param>
     public StreamingStateTracker(ProxyConfig config, string? requestedModel = null)
     {
-        _config = config;
-        _requestedModel = requestedModel;
+        this.config = config;
+        this.requestedModel = requestedModel;
     }
 
     /// <summary>
     /// Gets the number of tool invocations seen so far in this streaming response.
     /// Incremented by <see cref="HandleOutputItemAdded"/> each time a <c>response.output_item.added</c>
-    /// event with <c>type == "function_call"</c> adds an entry to <see cref="_outputItemToBlockIndex"/>.
+    /// event with <c>type == "function_call"</c> adds an entry to <see cref="outputItemToBlockIndex"/>.
     /// Read after the stream loop completes to get the final count.
     /// </summary>
-    public int ToolUseCount => _outputItemToBlockIndex.Count;
+    public int ToolUseCount => this.outputItemToBlockIndex.Count;
 
     /// <summary>
     /// Processes a single OpenAI SSE event and yields zero or more corresponding Anthropic SSE events.
@@ -55,7 +55,10 @@ public class StreamingStateTracker
             yield break;
         }
 
-        if (data == null) yield break;
+        if (data == null)
+        {
+            yield break;
+        }
 
         switch (eventType)
         {
@@ -105,10 +108,10 @@ public class StreamingStateTracker
             ["type"] = "message_start",
             ["message"] = new JsonObject
             {
-                ["id"] = _messageId,
+                ["id"] = this.messageId,
                 ["type"] = "message",
                 ["role"] = "assistant",
-                ["model"] = _requestedModel ?? _config.Model,
+                ["model"] = this.requestedModel ?? this.config.Model,
                 ["content"] = new JsonArray(),
                 ["stop_reason"] = null,
                 ["stop_sequence"] = null,
@@ -133,9 +136,9 @@ public class StreamingStateTracker
 
         if (type == "function_call")
         {
-            _hasToolUse = true;
-            int index = _contentBlockIndex++;
-            _outputItemToBlockIndex[itemId] = index;
+            this.hasToolUse = true;
+            int index = this.contentBlockIndex++;
+            this.outputItemToBlockIndex[itemId] = index;
 
             yield return ("content_block_start", new JsonObject
             {
@@ -160,10 +163,10 @@ public class StreamingStateTracker
         string? type = part["type"]?.GetValue<string>();
         if (type == "output_text")
         {
-            int index = _contentBlockIndex++;
+            int index = this.contentBlockIndex++;
             int outputIndex = data["output_index"]?.GetValue<int>() ?? 0;
             int contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
-            _contentPartToBlockIndex[(outputIndex, contentIndex)] = index;
+            this.contentPartToBlockIndex[(outputIndex, contentIndex)] = index;
 
             yield return ("content_block_start", new JsonObject
             {
@@ -197,7 +200,7 @@ public class StreamingStateTracker
     private JsonObject CreateInputJsonDelta(JsonNode data)
     {
         string itemId = data["item_id"]?.GetValue<string>() ?? "";
-        int blockIndex = _outputItemToBlockIndex.GetValueOrDefault(itemId, 0);
+        int blockIndex = this.outputItemToBlockIndex.GetValueOrDefault(itemId, 0);
 
         return new JsonObject
         {
@@ -230,7 +233,7 @@ public class StreamingStateTracker
         if (type == "function_call")
         {
             string itemId = item["id"]?.GetValue<string>() ?? "";
-            int blockIndex = _outputItemToBlockIndex.GetValueOrDefault(itemId, 0);
+            int blockIndex = this.outputItemToBlockIndex.GetValueOrDefault(itemId, 0);
 
             yield return ("content_block_stop", new JsonObject
             {
@@ -243,7 +246,7 @@ public class StreamingStateTracker
     private IEnumerable<(string, JsonObject)> HandleCompleted(JsonNode data)
     {
         JsonNode? response = data["response"];
-        string stopReason = _hasToolUse ? "tool_use" : "end_turn";
+        string stopReason = this.hasToolUse ? "tool_use" : "end_turn";
         if (response?["status"]?.GetValue<string>() == "incomplete")
         {
             stopReason = "max_tokens";
@@ -278,6 +281,6 @@ public class StreamingStateTracker
         int contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
         (int outputIndex, int contentIndex) key = (outputIndex, contentIndex);
 
-        return this._contentPartToBlockIndex.GetValueOrDefault(key, contentIndex); // fallback for safety
+        return this.contentPartToBlockIndex.GetValueOrDefault(key, contentIndex); // fallback for safety
     }
 }

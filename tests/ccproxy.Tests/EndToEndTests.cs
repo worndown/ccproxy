@@ -10,11 +10,11 @@ namespace CCProxy.Tests;
 
 public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
 {
-    private readonly HttpClient _client;
+    private readonly HttpClient client;
 
     public EndToEndTests(TestFactory factory)
     {
-        _client = factory.CreateClient();
+        this.client = factory.CreateClient();
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         }
         """, Encoding.UTF8, "application/json");
 
-        var response = await _client.PostAsync("/v1/messages", request);
+        var response = await this.client.PostAsync("/v1/messages", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<JsonNode>();
@@ -58,7 +58,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         }
         """, Encoding.UTF8, "application/json");
 
-        var response = await _client.PostAsync("/v1/messages", request);
+        var response = await this.client.PostAsync("/v1/messages", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<JsonNode>();
@@ -77,7 +77,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         }
         """, Encoding.UTF8, "application/json");
 
-        var response = await _client.PostAsync("/v1/messages", request);
+        var response = await this.client.PostAsync("/v1/messages", request);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/event-stream", response.Content.Headers.ContentType!.MediaType);
 
@@ -96,7 +96,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         }
         """, Encoding.UTF8, "application/json");
 
-        var response = await _client.PostAsync("/v1/messages", request);
+        var response = await this.client.PostAsync("/v1/messages", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         var body = await response.Content.ReadFromJsonAsync<JsonNode>();
@@ -115,7 +115,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         }
         """, Encoding.UTF8, "application/json");
 
-        var response = await _client.PostAsync("/v1/messages", request);
+        var response = await this.client.PostAsync("/v1/messages", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -123,7 +123,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
     public async Task WrongContentType_Returns415()
     {
         var request = new StringContent("not json", Encoding.UTF8, "text/plain");
-        var response = await _client.PostAsync("/v1/messages", request);
+        var response = await this.client.PostAsync("/v1/messages", request);
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
     }
 

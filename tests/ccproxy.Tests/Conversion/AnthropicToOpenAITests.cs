@@ -6,7 +6,7 @@ namespace CCProxy.Tests.Conversion;
 
 public class AnthropicToOpenAITests
 {
-    private readonly ProxyConfig _config = new()
+    private readonly ProxyConfig config = new()
     {
         Model = "gpt-5-codex",
         EndpointUrl = "https://test.openai.azure.com",
@@ -26,7 +26,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
 
         Assert.Equal("gpt-5-codex", result["model"]!.GetValue<string>());
         Assert.Equal(1024, result["max_output_tokens"]!.GetValue<int>());
@@ -49,7 +49,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         Assert.Equal("gpt-5-codex", result["model"]!.GetValue<string>());
     }
 
@@ -65,7 +65,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         Assert.Equal("You are helpful", result["instructions"]!.GetValue<string>());
     }
 
@@ -81,7 +81,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         Assert.Equal("Part 1\nPart 2", result["instructions"]!.GetValue<string>());
     }
 
@@ -98,7 +98,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         Assert.Equal(0.7, result["temperature"]!.GetValue<double>(), 0.001);
         Assert.Equal(0.9, result["top_p"]!.GetValue<double>(), 0.001);
     }
@@ -118,7 +118,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         var input = result["input"]!.AsArray();
         Assert.Equal(3, input.Count);
         Assert.Equal("user", input[0]!["role"]!.GetValue<string>());
@@ -148,7 +148,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         var tools = result["tools"]!.AsArray();
         Assert.Single(tools);
         Assert.Equal("function", tools[0]!["type"]!.GetValue<string>());
@@ -169,7 +169,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         Assert.Equal("auto", result["tool_choice"]!.GetValue<string>());
     }
 
@@ -185,7 +185,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         Assert.Equal("required", result["tool_choice"]!.GetValue<string>());
     }
 
@@ -201,7 +201,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         var tc = result["tool_choice"]!;
         Assert.Equal("function", tc["type"]!.GetValue<string>());
         Assert.Equal("get_weather", tc["name"]!.GetValue<string>());
@@ -227,7 +227,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         var input = result["input"]!.AsArray();
 
         // Should have: user message, assistant text, function_call, function_call_output
@@ -266,7 +266,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         var input = result["input"]!.AsArray();
         var content = input[0]!["content"]!.AsArray();
         Assert.Equal(2, content.Count);
@@ -294,7 +294,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config);
+        var result = AnthropicToOpenAI.Convert(request, this.config);
         var input = result["input"]!.AsArray();
         Assert.Equal("function_call_output", input[0]!["type"]!.GetValue<string>());
         Assert.Equal("Line 1\nLine 2", input[0]!["output"]!.GetValue<string>());
@@ -311,7 +311,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config, stream: true);
+        var result = AnthropicToOpenAI.Convert(request, this.config, stream: true);
         Assert.True(result["stream"]!.GetValue<bool>());
     }
 
@@ -326,7 +326,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, _config, stream: false);
+        var result = AnthropicToOpenAI.Convert(request, this.config, stream: false);
         Assert.Null(result["stream"]);
     }
 }

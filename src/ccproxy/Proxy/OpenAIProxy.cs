@@ -11,19 +11,19 @@ namespace CCProxy.Proxy;
 /// </summary>
 public class OpenAIProxy
 {
-    private readonly HttpClient _httpClient;
-    private readonly ProxyConfig _config;
+    private readonly HttpClient httpClient;
+    private readonly ProxyConfig config;
 
     public OpenAIProxy(HttpClient httpClient, ProxyConfig config)
     {
-        _httpClient = httpClient;
-        _config = config;
-        _httpClient.Timeout = TimeSpan.FromMinutes(5);
+        this.httpClient = httpClient;
+        this.config = config;
+        this.httpClient.Timeout = TimeSpan.FromMinutes(5);
     }
 
     private string BuildRequestUrl()
     {
-        string baseUrl = _config.EndpointUrl.TrimEnd('/');
+        string baseUrl = this.config.EndpointUrl.TrimEnd('/');
         return $"{baseUrl}/openai/responses?api-version=2025-03-01-preview";
     }
 
@@ -33,14 +33,14 @@ public class OpenAIProxy
     /// <exception cref="OpenAIProxyException">Thrown when Azure returns a non-success status code.</exception>
     public async Task<JsonNode?> SendRequestAsync(JsonObject requestBody, CancellationToken cancellationToken = default)
     {
-        string url = BuildRequestUrl();
+        string url = this.BuildRequestUrl();
         Logger.LogRequest("OpenAI Request", requestBody);
 
         StringContent content = new StringContent(requestBody.ToJsonString(), Encoding.UTF8, "application/json");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-        request.Headers.Add("api-key", _config.ApiKey);
+        request.Headers.Add("api-key", this.config.ApiKey);
 
-        HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+        HttpResponseMessage response = await this.httpClient.SendAsync(request, cancellationToken);
         string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -62,14 +62,14 @@ public class OpenAIProxy
     /// <exception cref="OpenAIProxyException">Thrown when Azure returns a non-success status code.</exception>
     public async Task<(Stream Stream, int StatusCode)> SendStreamingRequestAsync(JsonObject requestBody, CancellationToken cancellationToken = default)
     {
-        string url = BuildRequestUrl();
+        string url = this.BuildRequestUrl();
         Logger.LogRequest("OpenAI Streaming Request", requestBody);
 
         StringContent content = new StringContent(requestBody.ToJsonString(), Encoding.UTF8, "application/json");
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-        request.Headers.Add("api-key", _config.ApiKey);
+        request.Headers.Add("api-key", this.config.ApiKey);
 
-        HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        HttpResponseMessage response = await this.httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -97,7 +97,7 @@ public class OpenAIProxyException : Exception
     public OpenAIProxyException(int statusCode, string responseBody)
         : base($"OpenAI API returned {statusCode}: {responseBody}")
     {
-        StatusCode = statusCode;
-        ResponseBody = responseBody;
+        this.StatusCode = statusCode;
+        this.ResponseBody = responseBody;
     }
 }

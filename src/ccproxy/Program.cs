@@ -3,12 +3,12 @@ using CCProxy.Diagnostics;
 using CCProxy.Endpoints;
 using CCProxy.Proxy;
 
-var config = ProxyConfig.FromArgs(args);
+ProxyConfig config = ProxyConfig.FromArgs(args);
 config.Validate();
 
 Logger.Initialize(config.LogFile);
 
-var builder = WebApplication.CreateBuilder();
+WebApplicationBuilder builder = WebApplication.CreateBuilder();
 
 // Disable default URL configuration - we control the port
 builder.WebHost.UseUrls($"http://localhost:{config.Port}");
@@ -17,7 +17,7 @@ builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<OpenAIProxy>();
 builder.Services.AddSingleton<HttpClient>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 // Map endpoints
 MessagesEndpoint.Map(app);

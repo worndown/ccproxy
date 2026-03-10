@@ -10,8 +10,8 @@ namespace CCProxy.Diagnostics;
 /// </summary>
 public static class Logger
 {
-    private static readonly JsonSerializerOptions s_prettyOptions = new() { WriteIndented = true };
-    private static StreamWriter? s_fileWriter;
+    private static readonly JsonSerializerOptions PrettyOptions = new() { WriteIndented = true };
+    private static StreamWriter? fileWriter;
 
     /// <summary>
     /// Initializes file-based verbose logging. If <paramref name="logFilePath"/> is non-null,
@@ -21,16 +21,16 @@ public static class Logger
     {
         if (logFilePath != null)
         {
-            s_fileWriter = new StreamWriter(logFilePath, append: false) { AutoFlush = true };
+            fileWriter = new StreamWriter(logFilePath, append: false) { AutoFlush = true };
         }
     }
 
     /// <summary>Flushes and closes the log file writer, if any.</summary>
     public static void Shutdown()
     {
-        s_fileWriter?.Flush();
-        s_fileWriter?.Dispose();
-        s_fileWriter = null;
+        fileWriter?.Flush();
+        fileWriter?.Dispose();
+        fileWriter = null;
     }
 
     /// <summary>Logs an informational message to stderr (always printed).</summary>
@@ -48,32 +48,32 @@ public static class Logger
     /// <summary>Logs a request JSON payload to the log file (if initialized).</summary>
     public static void LogRequest(string label, JsonNode? json)
     {
-        if (s_fileWriter == null) return;
-        s_fileWriter.WriteLine($"[ccproxy] >>> {label}:");
-        s_fileWriter.WriteLine(json?.ToJsonString(s_prettyOptions) ?? "(null)");
+        if (fileWriter == null) return;
+        fileWriter.WriteLine($"[ccproxy] >>> {label}:");
+        fileWriter.WriteLine(json?.ToJsonString(PrettyOptions) ?? "(null)");
     }
 
     /// <summary>Logs a response JSON payload to the log file (if initialized).</summary>
     public static void LogResponse(string label, JsonNode? json)
     {
-        if (s_fileWriter == null) return;
-        s_fileWriter.WriteLine($"[ccproxy] <<< {label}:");
-        s_fileWriter.WriteLine(json?.ToJsonString(s_prettyOptions) ?? "(null)");
+        if (fileWriter == null) return;
+        fileWriter.WriteLine($"[ccproxy] <<< {label}:");
+        fileWriter.WriteLine(json?.ToJsonString(PrettyOptions) ?? "(null)");
     }
 
     /// <summary>Logs an SSE event to the log file (if initialized).</summary>
     public static void LogSseEvent(string direction, string eventType, string data)
     {
-        if (s_fileWriter == null) return;
-        s_fileWriter.WriteLine($"[ccproxy] {direction} SSE event: {eventType}");
+        if (fileWriter == null) return;
+        fileWriter.WriteLine($"[ccproxy] {direction} SSE event: {eventType}");
         try
         {
             var node = JsonNode.Parse(data);
-            s_fileWriter.WriteLine(node?.ToJsonString(s_prettyOptions) ?? data);
+            fileWriter.WriteLine(node?.ToJsonString(PrettyOptions) ?? data);
         }
         catch
         {
-            s_fileWriter.WriteLine(data);
+            fileWriter.WriteLine(data);
         }
     }
 
