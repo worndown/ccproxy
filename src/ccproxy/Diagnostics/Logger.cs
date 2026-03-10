@@ -80,9 +80,9 @@ public static class Logger
     /// <summary>
     /// Writes a concise 2-line request summary to stderr.
     /// </summary>
-    public static void LogRequestSummary(string method, string path, int statusCode, string model, int toolCount, int messageCount)
+    public static void LogRequestSummary(string method, string path, int statusCode, string model, int toolCount, int toolUseCount, int messageCount)
     {
         Console.Error.WriteLine($"[ccproxy] {method} {path} - {statusCode}");
-        Console.Error.WriteLine($"[ccproxy] {model} -> {toolCount} tools {messageCount} messages");
+        Console.Error.WriteLine($"[ccproxy] {model} -> {toolCount} tools ({toolUseCount} invocations) {messageCount} messages");
     }
 }

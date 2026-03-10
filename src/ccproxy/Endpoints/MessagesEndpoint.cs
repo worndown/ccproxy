@@ -70,16 +70,17 @@ public static class MessagesEndpoint
             var toolCount = requestBody["tools"]?.AsArray()?.Count ?? 0;
             var messageCount = messages.Count;
             var summaryStatusCode = 200;
+            var toolUseCount = 0;
 
             try
             {
                 if (isStreaming)
                 {
-                    await HandleStreaming(context, requestBody, proxy, config, requestedModel);
+                    toolUseCount = await HandleStreaming(context, requestBody, proxy, config, requestedModel);
                 }
                 else
                 {
-                    await HandleNonStreaming(context, requestBody, proxy, config, requestedModel);
+                    toolUseCount = await HandleNonStreaming(context, requestBody, proxy, config, requestedModel);
                 }
             }
             catch (OpenAIProxyException ex)
@@ -123,12 +124,12 @@ public static class MessagesEndpoint
             }
             finally
             {
-                Logger.LogRequestSummary("POST", "/v1/messages", summaryStatusCode, config.Model, toolCount, messageCount);
+                Logger.LogRequestSummary("POST", "/v1/messages", summaryStatusCode, config.Model, toolCount, toolUseCount, messageCount);
             }
         });
     }
 
-    private static async Task HandleNonStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
+    private static async Task<int> HandleNonStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
     {
         var openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: false);
         var openAiResponse = await proxy.SendRequestAsync(openAiRequest, context.RequestAborted);
@@ -137,15 +138,19 @@ public static class MessagesEndpoint
         {
             context.Response.StatusCode = 502;
             await context.Response.WriteAsJsonAsync(CreateError("api_error", "Empty response from Azure endpoint"));
-            return;
+            return 0;
         }
 
         var anthropicResponse = OpenAIToAnthropic.Convert(openAiResponse, config, requestedModel);
         Logger.LogResponse("Anthropic Response", anthropicResponse);
         await context.Response.WriteAsJsonAsync(anthropicResponse);
+
+        var toolUseCount = anthropicResponse["content"]?.AsArray()
+            .Count(item => item?["type"]?.GetValue<string>() == "tool_use");
+        return toolUseCount ?? 0;
     }
 
-    private static async Task HandleStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
+    private static async Task<int> HandleStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
     {
         var openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: true);
         var (stream, _) = await proxy.SendStreamingRequestAsync(openAiRequest, context.RequestAborted);
@@ -168,6 +173,10 @@ public static class MessagesEndpoint
                 }
             }
         }
+
+        // ToolUseCount is populated during the stream loop above: each "response.output_item.added"
+        // event with type "function_call" increments the count inside StreamingStateTracker.
+        return tracker.ToolUseCount;
     }
 
     private static async Task WriteSseEvent(HttpContext context, string eventType, JsonObject data)

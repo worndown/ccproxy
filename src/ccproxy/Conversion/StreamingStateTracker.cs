@@ -11,12 +11,13 @@ namespace CCProxy.Conversion;
 /// </summary>
 public class StreamingStateTracker
 {
+    private readonly string _messageId = $"msg_{Guid.NewGuid():N}";
     private readonly ProxyConfig _config;
     private readonly string? _requestedModel;
-    private int _contentBlockIndex = 0;
     private readonly Dictionary<string, int> _outputItemToBlockIndex = new();
+    private int _contentBlockIndex = 0;
     private bool _hasToolUse = false;
-    private string _messageId = $"msg_{Guid.NewGuid():N}";
+    
 
     /// <summary>
     /// Creates a new tracker for a single streaming response.
@@ -28,6 +29,14 @@ public class StreamingStateTracker
         _config = config;
         _requestedModel = requestedModel;
     }
+
+    /// <summary>
+    /// Gets the number of tool invocations seen so far in this streaming response.
+    /// Incremented by <see cref="HandleOutputItemAdded"/> each time a <c>response.output_item.added</c>
+    /// event with <c>type == "function_call"</c> adds an entry to <see cref="_outputItemToBlockIndex"/>.
+    /// Read after the stream loop completes to get the final count.
+    /// </summary>
+    public int ToolUseCount => _outputItemToBlockIndex.Count;
 
     /// <summary>
     /// Processes a single OpenAI SSE event and yields zero or more corresponding Anthropic SSE events.
