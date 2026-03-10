@@ -45,6 +45,28 @@ export ANTHROPIC_BASE_URL=http://localhost:5186
 
 Then use Claude Code as usual. The proxy transparently converts requests to the OpenAI Responses API format and responses back to Anthropic format. The model name from Claude Code is echoed back in responses so Claude Code remains unaware of the underlying model.
 
+## How It Works
+
+```mermaid
+flowchart LR
+    CC[Claude Code</br>Anthropic /v1/messages request]
+    EP[ccproxy /v1/messages</br>MessagesEndpoint]
+    A2O[AnthropicToOpenAI</br>request conversion]
+    AZ[Azure OpenAI</br>/v1/responses]
+    O2A[OpenAIToAnthropic</br>response conversion]
+    RESP[Anthropic-compatible</br>response]
+
+    CC --> EP --> A2O --> AZ --> O2A --> RESP
+
+    subgraph Streaming Path
+        SSE[SseReader parses SSE]
+        SST[StreamingStateTracker</br>builds Anthropic stream events]
+        AZ --> SSE --> SST --> RESP
+    end
+
+    RESP --> CC
+```
+
 ## Endpoints
 
 ### POST `/v1/messages`
@@ -104,30 +126,37 @@ dotnet run --project src/ccproxy -- \
 
 ```
 ccproxy/
+├── ccproxy.sln                         # Solution file
 ├── src/ccproxy/
-│   ├── Program.cs                  # Entry point and DI wiring
+│   ├── Program.cs                      # App bootstrap and DI wiring
+│   ├── ccproxy.csproj                  # ASP.NET Core proxy project
+│   ├── appsettings.json                # Default ASP.NET logging config
 │   ├── Configuration/
-│   │   └── ProxyConfig.cs          # CLI args and env var parsing
+│   │   └── ProxyConfig.cs              # CLI/env config parsing and validation
 │   ├── Endpoints/
-│   │   ├── MessagesEndpoint.cs     # /v1/messages handler
-│   │   └── ShutdownEndpoint.cs     # /shutdown handler
+│   │   ├── MessagesEndpoint.cs         # /v1/messages handler
+│   │   └── ShutdownEndpoint.cs         # /shutdown handler
 │   ├── Conversion/
-│   │   ├── AnthropicToOpenAI.cs    # Request translation
-│   │   ├── OpenAIToAnthropic.cs    # Response translation
-│   │   └── StreamingStateTracker.cs # SSE event state machine
+│   │   ├── AnthropicToOpenAI.cs        # Anthropic -> OpenAI request mapping
+│   │   ├── OpenAIToAnthropic.cs        # OpenAI -> Anthropic response mapping
+│   │   └── StreamingStateTracker.cs    # Streaming event state machine
 │   ├── Proxy/
-│   │   ├── OpenAIProxy.cs          # HTTP client for Azure
-│   │   └── SseReader.cs            # SSE protocol parser
-│   └── Diagnostics/
-│       └── Logger.cs               # Verbose logging to stderr
+│   │   ├── OpenAIProxy.cs              # Azure Responses API client
+│   │   └── SseReader.cs                # SSE stream parser
+│   ├── Diagnostics/
+│   │   └── Logger.cs                   # Stderr summaries + optional file logging
+│   └── Properties/
+│       └── launchSettings.json         # Local launch profile
 ├── tests/ccproxy.Tests/
-│   ├── Conversion/
-│   │   ├── AnthropicToOpenAITests.cs
-│   │   ├── OpenAIToAnthropicTests.cs
-│   │   └── StreamingStateTrackerTests.cs
-│   └── EndToEndTests.cs
+│   ├── ccproxy.Tests.csproj            # xUnit test project
+│   ├── GlobalUsings.cs                 # Shared test usings
+│   ├── EndToEndTests.cs                # End-to-end endpoint and streaming tests
+│   └── Conversion/
+│       ├── AnthropicToOpenAITests.cs
+│       ├── OpenAIToAnthropicTests.cs
+│       └── StreamingStateTrackerTests.cs
 └── docs/
-    └── PRD.md
+    └── PRD.md                          # Product requirements
 ```
 
 ## Testing
