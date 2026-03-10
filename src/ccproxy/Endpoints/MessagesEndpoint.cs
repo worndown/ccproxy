@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json.Nodes;
 using CCProxy.Configuration;
 using CCProxy.Conversion;
@@ -111,15 +112,13 @@ public static class MessagesEndpoint
             catch (HttpRequestException ex)
             {
                 Logger.LogError($"Network error: {ex.Message}");
-                summaryStatusCode = 502;
-                context.Response.StatusCode = 502;
+                summaryStatusCode = (int)(ex.StatusCode ?? HttpStatusCode.BadGateway);
                 await context.Response.WriteAsJsonAsync(CreateError("api_error", $"Failed to connect to Azure endpoint: {ex.Message}"));
             }
             catch (TaskCanceledException)
             {
                 Logger.LogError("Request timed out");
-                summaryStatusCode = 504;
-                context.Response.StatusCode = 504;
+                summaryStatusCode = (int)HttpStatusCode.BadGateway;
                 await context.Response.WriteAsJsonAsync(CreateError("api_error", "Request to Azure endpoint timed out"));
             }
             finally
@@ -136,7 +135,11 @@ public static class MessagesEndpoint
 
         if (openAiResponse == null)
         {
-            context.Response.StatusCode = 502;
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.BadGateway;
+            }
+
             await context.Response.WriteAsJsonAsync(CreateError("api_error", "Empty response from Azure endpoint"));
             return 0;
         }
@@ -145,8 +148,7 @@ public static class MessagesEndpoint
         Logger.LogResponse("Anthropic Response", anthropicResponse);
         await context.Response.WriteAsJsonAsync(anthropicResponse);
 
-        int? toolUseCount = anthropicResponse["content"]?.AsArray()
-            .Count(item => item?["type"]?.GetValue<string>() == "tool_use");
+        int? toolUseCount = anthropicResponse["content"]?.AsArray().Count(item => item?["type"]?.GetValue<string>() == "tool_use");
         return toolUseCount ?? 0;
     }
 
