@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace CCProxy.Endpoints;
 
 /// <summary>
@@ -8,10 +10,12 @@ public static class ShutdownEndpoint
     /// <summary>Maps the <c>/shutdown</c> route to the application.</summary>
     public static void Map(WebApplication app)
     {
-        app.MapPost("/shutdown", (IHostApplicationLifetime lifetime) =>
+        app.MapPost("/shutdown", async (HttpContext context, IHostApplicationLifetime lifetime) =>
         {
             lifetime.StopApplication();
-            return Results.Json(new { status = "shutting_down" });
+            context.Response.ContentType = "application/json";
+            var response = new JsonObject { ["status"] = "shutting_down" };
+            await context.Response.WriteAsync(response.ToJsonString());
         });
     }
 }

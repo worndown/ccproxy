@@ -140,7 +140,7 @@ public static class AnthropicToOpenAI
         if (content is JsonValue textVal)
         {
             // Simple string content
-            input.Add(new JsonObject
+            input.Add((JsonNode)new JsonObject
             {
                 ["type"] = "message",
                 ["role"] = "user",
@@ -166,11 +166,11 @@ public static class AnthropicToOpenAI
                 if (type == "tool_result")
                 {
                     // tool_result -> function_call_output (top-level input item)
-                    input.Add(ConvertToolResult(block));
+                    input.Add((JsonNode)ConvertToolResult(block));
                 }
                 else if (type == "text")
                 {
-                    messageContent.Add(new JsonObject
+                    messageContent.Add((JsonNode)new JsonObject
                     {
                         ["type"] = "input_text",
                         ["text"] = block["text"]!.DeepClone()
@@ -181,7 +181,7 @@ public static class AnthropicToOpenAI
                     JsonNode? source = block["source"];
                     string mediaType = source?["media_type"]?.GetValue<string>() ?? "image/png";
                     string data = source?["data"]?.GetValue<string>() ?? "";
-                    messageContent.Add(new JsonObject
+                    messageContent.Add((JsonNode)new JsonObject
                     {
                         ["type"] = "input_image",
                         ["image_url"] = $"data:{mediaType};base64,{data}"
@@ -191,7 +191,7 @@ public static class AnthropicToOpenAI
 
             if (messageContent.Count > 0)
             {
-                input.Add(new JsonObject
+                input.Add((JsonNode)new JsonObject
                 {
                     ["type"] = "message",
                     ["role"] = "user",
@@ -258,7 +258,7 @@ public static class AnthropicToOpenAI
     {
         if (content is JsonValue textVal)
         {
-            input.Add(new JsonObject
+            input.Add((JsonNode)new JsonObject
             {
                 ["type"] = "message",
                 ["role"] = "assistant",
@@ -291,7 +291,7 @@ public static class AnthropicToOpenAI
                     // Flush accumulated text first
                     if (textParts.Count > 0)
                     {
-                        input.Add(new JsonObject
+                        input.Add((JsonNode)new JsonObject
                         {
                             ["type"] = "message",
                             ["role"] = "assistant",
@@ -303,7 +303,7 @@ public static class AnthropicToOpenAI
 
                     string arguments = block["input"] is { } inp ? inp.ToJsonString() : "{}";
 
-                    input.Add(new JsonObject
+                    input.Add((JsonNode)new JsonObject
                     {
                         ["type"] = "function_call",
                         ["call_id"] = block["id"]?.DeepClone() ?? JsonValue.Create(""),
@@ -316,7 +316,7 @@ public static class AnthropicToOpenAI
             // Flush remaining text
             if (textParts.Count > 0)
             {
-                input.Add(new JsonObject
+                input.Add((JsonNode)new JsonObject
                 {
                     ["type"] = "message",
                     ["role"] = "assistant",
@@ -332,7 +332,7 @@ public static class AnthropicToOpenAI
         foreach (JsonNode? tool in tools)
         {
             if (tool == null) continue;
-            result.Add(new JsonObject
+            result.Add((JsonNode)new JsonObject
             {
                 ["type"] = "function",
                 ["name"] = tool["name"]?.DeepClone() ?? JsonValue.Create(""),

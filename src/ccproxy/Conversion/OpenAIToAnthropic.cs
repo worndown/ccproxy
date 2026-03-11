@@ -45,7 +45,7 @@ public static class OpenAIToAnthropic
                         {
                             if (part?["type"]?.GetValue<string>() == "output_text")
                             {
-                                content.Add(new JsonObject
+                                content.Add((JsonNode)new JsonObject
                                 {
                                     ["type"] = "text",
                                     ["text"] = part["text"]?.DeepClone() ?? JsonValue.Create("")
@@ -67,7 +67,7 @@ public static class OpenAIToAnthropic
                         parsedInput = new JsonObject();
                     }
 
-                    content.Add(new JsonObject
+                    content.Add((JsonNode)new JsonObject
                     {
                         ["type"] = "tool_use",
                         ["id"] = item["call_id"]?.DeepClone() ?? JsonValue.Create(""),

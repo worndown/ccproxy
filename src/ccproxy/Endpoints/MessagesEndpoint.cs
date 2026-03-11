@@ -24,7 +24,7 @@ public static class MessagesEndpoint
             if (!context.Request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) ?? true)
             {
                 context.Response.StatusCode = 415;
-                await context.Response.WriteAsJsonAsync(CreateError("invalid_request_error", "Content-Type must be application/json"));
+                await WriteJsonResponse(context, CreateError("invalid_request_error", "Content-Type must be application/json"));
                 return;
             }
 
@@ -36,14 +36,14 @@ public static class MessagesEndpoint
             catch
             {
                 context.Response.StatusCode = 400;
-                await context.Response.WriteAsJsonAsync(CreateError("invalid_request_error", "Invalid JSON in request body"));
+                await WriteJsonResponse(context, CreateError("invalid_request_error", "Invalid JSON in request body"));
                 return;
             }
 
             if (requestBody == null)
             {
                 context.Response.StatusCode = 400;
-                await context.Response.WriteAsJsonAsync(CreateError("invalid_request_error", "Empty request body"));
+                await WriteJsonResponse(context, CreateError("invalid_request_error", "Empty request body"));
                 return;
             }
 
@@ -54,7 +54,7 @@ public static class MessagesEndpoint
             if (maxTokens <= 0)
             {
                 context.Response.StatusCode = 400;
-                await context.Response.WriteAsJsonAsync(CreateError("invalid_request_error", "max_tokens must be greater than 0"));
+                await WriteJsonResponse(context, CreateError("invalid_request_error", "max_tokens must be greater than 0"));
                 return;
             }
 
@@ -62,7 +62,7 @@ public static class MessagesEndpoint
             if (messages == null || messages.Count == 0)
             {
                 context.Response.StatusCode = 400;
-                await context.Response.WriteAsJsonAsync(CreateError("invalid_request_error", "messages must be a non-empty array"));
+                await WriteJsonResponse(context, CreateError("invalid_request_error", "messages must be a non-empty array"));
                 return;
             }
 
@@ -107,19 +107,19 @@ public static class MessagesEndpoint
                 }
 
                 context.Response.StatusCode = statusCode;
-                await context.Response.WriteAsJsonAsync(CreateError(anthropicErrorType, ex.ResponseBody));
+                await WriteJsonResponse(context, CreateError(anthropicErrorType, ex.ResponseBody));
             }
             catch (HttpRequestException ex)
             {
                 Logger.LogError($"Network error: {ex.Message}");
                 summaryStatusCode = (int)(ex.StatusCode ?? HttpStatusCode.BadGateway);
-                await context.Response.WriteAsJsonAsync(CreateError("api_error", $"Failed to connect to Azure endpoint: {ex.Message}"));
+                await WriteJsonResponse(context, CreateError("api_error", $"Failed to connect to Azure endpoint: {ex.Message}"));
             }
             catch (TaskCanceledException)
             {
                 Logger.LogError("Request timed out");
                 summaryStatusCode = (int)HttpStatusCode.BadGateway;
-                await context.Response.WriteAsJsonAsync(CreateError("api_error", "Request to Azure endpoint timed out"));
+                await WriteJsonResponse(context, CreateError("api_error", "Request to Azure endpoint timed out"));
             }
             finally
             {
@@ -140,13 +140,13 @@ public static class MessagesEndpoint
                 context.Response.StatusCode = (int)HttpStatusCode.BadGateway;
             }
 
-            await context.Response.WriteAsJsonAsync(CreateError("api_error", "Empty response from Azure endpoint"));
+            await WriteJsonResponse(context, CreateError("api_error", "Empty response from Azure endpoint"));
             return 0;
         }
 
         JsonObject anthropicResponse = OpenAIToAnthropic.Convert(openAiResponse, config, requestedModel);
         Logger.LogResponse("Anthropic Response", anthropicResponse);
-        await context.Response.WriteAsJsonAsync(anthropicResponse);
+        await WriteJsonResponse(context, anthropicResponse);
 
         int? toolUseCount = anthropicResponse["content"]?.AsArray().Count(item => item?["type"]?.GetValue<string>() == "tool_use");
         return toolUseCount ?? 0;
@@ -189,6 +189,12 @@ public static class MessagesEndpoint
         await context.Response.Body.FlushAsync(context.RequestAborted);
     }
 
+    private static async Task WriteJsonResponse(HttpContext context, JsonNode data)
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(data.ToJsonString());
+    }
+
     private static (string ErrorType, int StatusCode) MapErrorStatus(int azureStatusCode)
     {
         return azureStatusCode switch
@@ -201,8 +207,12 @@ public static class MessagesEndpoint
         };
     }
 
-    private static object CreateError(string type, string message)
+    private static JsonObject CreateError(string type, string message)
     {
-        return new { type = "error", error = new { type, message } };
+        return new JsonObject
+        {
+            ["type"] = "error",
+            ["error"] = new JsonObject { ["type"] = type, ["message"] = message }
+        };
     }
 }
