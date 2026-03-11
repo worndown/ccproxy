@@ -46,6 +46,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          mkdir -p $HOME/.local/bin
+          ln -s /usr/bin/aarch64-linux-gnu-objcopy $HOME/.local/bin/objcopy
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Publish
         run: >
@@ -54,7 +57,6 @@ jobs:
           --runtime ${{ matrix.rid }}
           --output ./publish/${{ matrix.rid }}
           -p:Version=${{ steps.version.outputs.value }}
-          ${{ matrix.rid == 'linux-arm64' && '-p:ObjCopy=aarch64-linux-gnu-objcopy' || '' }}
 
       - name: Archive (Linux/macOS)
         if: runner.os != 'Windows'
