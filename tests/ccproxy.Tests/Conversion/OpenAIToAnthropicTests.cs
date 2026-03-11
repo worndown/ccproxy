@@ -1,17 +1,10 @@
 using System.Text.Json.Nodes;
-using CCProxy.Configuration;
 using CCProxy.Conversion;
 
 namespace CCProxy.Tests.Conversion;
 
 public class OpenAIToAnthropicTests
 {
-    private readonly ProxyConfig config = new()
-    {
-        Model = "gpt-5-codex",
-        EndpointUrl = "https://test.openai.azure.com",
-        ApiKey = "test-key"
-    };
 
     [Fact]
     public void Convert_TextResponse_MapsCorrectly()
@@ -32,13 +25,12 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config);
+        var result = OpenAIToAnthropic.Convert(response, "claude-sonnet-4-20250514");
 
         Assert.StartsWith("msg_", result["id"]!.GetValue<string>());
         Assert.Equal("message", result["type"]!.GetValue<string>());
         Assert.Equal("assistant", result["role"]!.GetValue<string>());
-        // Without requestedModel, falls back to config.Model
-        Assert.Equal("gpt-5-codex", result["model"]!.GetValue<string>());
+        Assert.Equal("claude-sonnet-4-20250514", result["model"]!.GetValue<string>());
         Assert.Equal("end_turn", result["stop_reason"]!.GetValue<string>());
 
         var content = result["content"]!.AsArray();
@@ -69,7 +61,7 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config);
+        var result = OpenAIToAnthropic.Convert(response, "test-model");
 
         Assert.Equal("tool_use", result["stop_reason"]!.GetValue<string>());
         var content = result["content"]!.AsArray();
@@ -105,7 +97,7 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config);
+        var result = OpenAIToAnthropic.Convert(response, "test-model");
 
         Assert.Equal("tool_use", result["stop_reason"]!.GetValue<string>());
         var content = result["content"]!.AsArray();
@@ -133,7 +125,7 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config);
+        var result = OpenAIToAnthropic.Convert(response, "test-model");
         Assert.Equal("max_tokens", result["stop_reason"]!.GetValue<string>());
     }
 
@@ -156,7 +148,7 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config);
+        var result = OpenAIToAnthropic.Convert(response, "test-model");
         var content = result["content"]!.AsArray();
         Assert.NotNull(content[0]!["input"]);
     }
@@ -173,7 +165,7 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config);
+        var result = OpenAIToAnthropic.Convert(response, "test-model");
         Assert.Equal(0, result["usage"]!["cache_creation_input_tokens"]!.GetValue<int>());
         Assert.Equal(0, result["usage"]!["cache_read_input_tokens"]!.GetValue<int>());
     }
@@ -190,23 +182,8 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, this.config, "claude-sonnet-4-20250514");
+        var result = OpenAIToAnthropic.Convert(response, "claude-sonnet-4-20250514");
         Assert.Equal("claude-sonnet-4-20250514", result["model"]!.GetValue<string>());
     }
 
-    [Fact]
-    public void Convert_WithNullRequestedModel_FallsBackToConfig()
-    {
-        var response = JsonNode.Parse("""
-        {
-            "id": "resp_n",
-            "status": "completed",
-            "output": [{"type": "message", "content": [{"type": "output_text", "text": "Hi"}]}],
-            "usage": {"input_tokens": 10, "output_tokens": 5}
-        }
-        """)!;
-
-        var result = OpenAIToAnthropic.Convert(response, this.config, null);
-        Assert.Equal("gpt-5-codex", result["model"]!.GetValue<string>());
-    }
 }

@@ -147,7 +147,6 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         {
             // Set required env vars for config validation
             Environment.SetEnvironmentVariable("CCPROXY_ENDPOINT_URL", "https://mock.openai.azure.com");
-            Environment.SetEnvironmentVariable("CCPROXY_MODEL", "gpt-5-codex");
             Environment.SetEnvironmentVariable("CCPROXY_API_KEY", "test-key");
 
             builder.ConfigureServices(services =>

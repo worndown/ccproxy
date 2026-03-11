@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using CCProxy.Configuration;
 
 namespace CCProxy.Conversion;
 
@@ -13,14 +12,9 @@ public static class OpenAIToAnthropic
     /// Converts an OpenAI Responses API response into an Anthropic <c>/v1/messages</c> response.
     /// </summary>
     /// <param name="openAiResponse">The OpenAI response JSON.</param>
-    /// <param name="config">Proxy configuration (provides fallback model name).</param>
-    /// <param name="requestedModel">
-    /// The model name from the original Anthropic request. When provided, this value is echoed
-    /// back in the response so Claude Code remains unaware of the underlying model.
-    /// Falls back to <c>config.Model</c> if <c>null</c>.
-    /// </param>
+    /// <param name="requestedModel">The model name from the original Anthropic request, echoed back in the response.</param>
     /// <returns>An Anthropic Messages API response as a <see cref="JsonObject"/>.</returns>
-    public static JsonObject Convert(JsonNode openAiResponse, ProxyConfig config, string? requestedModel = null)
+    public static JsonObject Convert(JsonNode openAiResponse, string requestedModel)
     {
         JsonArray content = new JsonArray();
         bool hasToolUse = false;
@@ -100,7 +94,7 @@ public static class OpenAIToAnthropic
             ["id"] = responseId,
             ["type"] = "message",
             ["role"] = "assistant",
-            ["model"] = requestedModel ?? config.Model,
+            ["model"] = requestedModel,
             ["content"] = content,
             ["stop_reason"] = stopReason,
             ["stop_sequence"] = null,
