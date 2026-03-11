@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using CCProxy.Configuration;
 using CCProxy.Conversion;
 using CCProxy.Diagnostics;
 using CCProxy.Proxy;
@@ -18,7 +17,7 @@ public static class MessagesEndpoint
     /// <summary>Maps the <c>/v1/messages</c> route to the application.</summary>
     public static void Map(WebApplication app)
     {
-        app.MapPost("/v1/messages", async (HttpContext context, OpenAIProxy proxy, ProxyConfig config) =>
+        app.MapPost("/v1/messages", async (HttpContext context, OpenAIProxy proxy) =>
         {
             // Content-Type validation
             if (!context.Request.ContentType?.Contains("application/json", StringComparison.OrdinalIgnoreCase) ?? true)
@@ -67,7 +66,7 @@ public static class MessagesEndpoint
             }
 
             bool isStreaming = requestBody["stream"]?.GetValue<bool>() ?? false;
-            string? requestedModel = requestBody["model"]?.GetValue<string>();
+            string requestedModel = requestBody["model"]?.GetValue<string>() ?? "unknown";
             int toolCount = requestBody["tools"]?.AsArray()?.Count ?? 0;
             int messageCount = messages.Count;
             int summaryStatusCode = 200;
@@ -77,11 +76,11 @@ public static class MessagesEndpoint
             {
                 if (isStreaming)
                 {
-                    toolUseCount = await HandleStreaming(context, requestBody, proxy, config, requestedModel);
+                    toolUseCount = await HandleStreaming(context, requestBody, proxy, requestedModel);
                 }
                 else
                 {
-                    toolUseCount = await HandleNonStreaming(context, requestBody, proxy, config, requestedModel);
+                    toolUseCount = await HandleNonStreaming(context, requestBody, proxy, requestedModel);
                 }
             }
             catch (OpenAIProxyException ex)
@@ -123,14 +122,14 @@ public static class MessagesEndpoint
             }
             finally
             {
-                Logger.LogRequestSummary("POST", "/v1/messages", summaryStatusCode, config.Model, toolCount, toolUseCount, messageCount);
+                Logger.LogRequestSummary("POST", "/v1/messages", summaryStatusCode, requestedModel, toolCount, toolUseCount, messageCount);
             }
         });
     }
 
-    private static async Task<int> HandleNonStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
+    private static async Task<int> HandleNonStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, string requestedModel)
     {
-        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: false);
+        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, stream: false);
         JsonNode? openAiResponse = await proxy.SendRequestAsync(openAiRequest, context.RequestAborted);
 
         if (openAiResponse == null)
@@ -144,7 +143,7 @@ public static class MessagesEndpoint
             return 0;
         }
 
-        JsonObject anthropicResponse = OpenAIToAnthropic.Convert(openAiResponse, config, requestedModel);
+        JsonObject anthropicResponse = OpenAIToAnthropic.Convert(openAiResponse, requestedModel);
         Logger.LogResponse("Anthropic Response", anthropicResponse);
         await WriteJsonResponse(context, anthropicResponse);
 
@@ -152,16 +151,16 @@ public static class MessagesEndpoint
         return toolUseCount ?? 0;
     }
 
-    private static async Task<int> HandleStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, ProxyConfig config, string? requestedModel)
+    private static async Task<int> HandleStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, string requestedModel)
     {
-        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, config, stream: true);
+        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, stream: true);
         (Stream stream, _) = await proxy.SendStreamingRequestAsync(openAiRequest, context.RequestAborted);
 
         context.Response.ContentType = "text/event-stream";
         context.Response.Headers["Cache-Control"] = "no-cache";
         context.Response.Headers["Connection"] = "keep-alive";
 
-        StreamingStateTracker tracker = new StreamingStateTracker(config, requestedModel);
+        StreamingStateTracker tracker = new StreamingStateTracker(requestedModel);
 
         await using (stream)
         {

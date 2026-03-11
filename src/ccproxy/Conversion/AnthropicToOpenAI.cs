@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using CCProxy.Configuration;
 
 namespace CCProxy.Conversion;
 
@@ -11,17 +10,16 @@ public static class AnthropicToOpenAI
 {
     /// <summary>
     /// Converts an Anthropic <c>/v1/messages</c> request body into an OpenAI Responses API request body.
-    /// The outbound model is always set from <paramref name="config"/>, ignoring the incoming model name.
+    /// The model name from the Anthropic request is passed through as-is.
     /// </summary>
     /// <param name="anthropicRequest">The incoming Anthropic request JSON.</param>
-    /// <param name="config">Proxy configuration (provides the target model and endpoint).</param>
     /// <param name="stream">Whether to set <c>"stream": true</c> on the outbound request.</param>
     /// <returns>An OpenAI Responses API request as a <see cref="JsonObject"/>.</returns>
-    public static JsonObject Convert(JsonNode anthropicRequest, ProxyConfig config, bool stream = false)
+    public static JsonObject Convert(JsonNode anthropicRequest, bool stream = false)
     {
         JsonObject result = new JsonObject
         {
-            ["model"] = config.Model,
+            ["model"] = anthropicRequest["model"]?.DeepClone(),
         };
 
         // reasoning -> high

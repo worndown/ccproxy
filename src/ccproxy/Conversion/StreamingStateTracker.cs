@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using CCProxy.Configuration;
 using CCProxy.Proxy;
 
 namespace CCProxy.Conversion;
@@ -12,22 +11,18 @@ namespace CCProxy.Conversion;
 public class StreamingStateTracker
 {
     private readonly string messageId = $"msg_{Guid.NewGuid():N}";
-    private readonly ProxyConfig config;
-    private readonly string? requestedModel;
+    private readonly string requestedModel;
     private readonly Dictionary<string, int> outputItemToBlockIndex = new();
     private readonly Dictionary<(int OutputIndex, int ContentIndex), int> contentPartToBlockIndex = new();
     private int contentBlockIndex = 0;
     private bool hasToolUse = false;
-    
 
     /// <summary>
     /// Creates a new tracker for a single streaming response.
     /// </summary>
-    /// <param name="config">Proxy configuration.</param>
     /// <param name="requestedModel">Original model name from the Anthropic request, echoed back in <c>message_start</c>.</param>
-    public StreamingStateTracker(ProxyConfig config, string? requestedModel = null)
+    public StreamingStateTracker(string requestedModel)
     {
-        this.config = config;
         this.requestedModel = requestedModel;
     }
 
@@ -101,6 +96,9 @@ public class StreamingStateTracker
         }
     }
 
+    /// <summary>
+    /// Creates the initial <c>message_start</c> event with empty content and zero usage counters.
+    /// </summary>
     private JsonObject CreateMessageStart()
     {
         return new JsonObject
@@ -111,7 +109,7 @@ public class StreamingStateTracker
                 ["id"] = this.messageId,
                 ["type"] = "message",
                 ["role"] = "assistant",
-                ["model"] = this.requestedModel ?? this.config.Model,
+                ["model"] = this.requestedModel,
                 ["content"] = new JsonArray(),
                 ["stop_reason"] = null,
                 ["stop_sequence"] = null,
@@ -126,6 +124,10 @@ public class StreamingStateTracker
         };
     }
 
+    /// <summary>
+    /// Handles <c>response.output_item.added</c> — emits a <c>content_block_start</c> for function calls
+    /// and tracks the mapping from output item ID to Anthropic block index.
+    /// </summary>
     private IEnumerable<(string, JsonObject)> HandleOutputItemAdded(JsonNode data)
     {
         JsonNode? item = data["item"];
@@ -155,6 +157,10 @@ public class StreamingStateTracker
         }
     }
 
+    /// <summary>
+    /// Handles <c>response.content_part.added</c> — emits a <c>content_block_start</c> for text parts
+    /// and tracks the mapping from (output_index, content_index) to Anthropic block index.
+    /// </summary>
     private IEnumerable<(string, JsonObject)> HandleContentPartAdded(JsonNode data)
     {
         JsonNode? part = data["part"];
@@ -181,6 +187,9 @@ public class StreamingStateTracker
         }
     }
 
+    /// <summary>
+    /// Creates a <c>content_block_delta</c> with a <c>text_delta</c> payload from an <c>response.output_text.delta</c> event.
+    /// </summary>
     private JsonObject CreateTextDelta(JsonNode data)
     {
         int blockIndex = FindTextBlockIndex(data);
@@ -197,6 +206,10 @@ public class StreamingStateTracker
         };
     }
 
+    /// <summary>
+    /// Creates a <c>content_block_delta</c> with an <c>input_json_delta</c> payload from a
+    /// <c>response.function_call_arguments.delta</c> event.
+    /// </summary>
     private JsonObject CreateInputJsonDelta(JsonNode data)
     {
         string itemId = data["item_id"]?.GetValue<string>() ?? "";
@@ -214,6 +227,9 @@ public class StreamingStateTracker
         };
     }
 
+    /// <summary>
+    /// Handles <c>response.content_part.done</c> — emits a <c>content_block_stop</c> for the corresponding text block.
+    /// </summary>
     private IEnumerable<(string, JsonObject)> HandleContentPartDone(JsonNode data)
     {
         int blockIndex = FindTextBlockIndex(data);
@@ -224,6 +240,9 @@ public class StreamingStateTracker
         });
     }
 
+    /// <summary>
+    /// Handles <c>response.output_item.done</c> — emits a <c>content_block_stop</c> for completed function calls.
+    /// </summary>
     private IEnumerable<(string, JsonObject)> HandleOutputItemDone(JsonNode data)
     {
         JsonNode? item = data["item"];
@@ -243,6 +262,10 @@ public class StreamingStateTracker
         }
     }
 
+    /// <summary>
+    /// Handles <c>response.completed</c> — emits <c>message_delta</c> (with stop reason and usage)
+    /// followed by <c>message_stop</c> to close the stream.
+    /// </summary>
     private IEnumerable<(string, JsonObject)> HandleCompleted(JsonNode data)
     {
         JsonNode? response = data["response"];
@@ -275,6 +298,10 @@ public class StreamingStateTracker
         });
     }
 
+    /// <summary>
+    /// Resolves the Anthropic content block index for a text-related event using its
+    /// <c>output_index</c> and <c>content_index</c> fields.
+    /// </summary>
     private int FindTextBlockIndex(JsonNode data)
     {
         int outputIndex = data["output_index"]?.GetValue<int>() ?? 0;

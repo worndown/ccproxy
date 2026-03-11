@@ -25,7 +25,9 @@ public static class Logger
         }
     }
 
-    /// <summary>Flushes and closes the log file writer, if any.</summary>
+    /// <summary>
+    /// Flushes and closes the log file writer, if any.
+    /// </summary>
     public static void Shutdown()
     {
         fileWriter?.Flush();
@@ -33,19 +35,25 @@ public static class Logger
         fileWriter = null;
     }
 
-    /// <summary>Logs an informational message to stderr (always printed).</summary>
+    /// <summary>
+    /// Logs an informational message to stderr (always printed).
+    /// </summary>
     public static void LogInfo(string message)
     {
         Console.Error.WriteLine($"[ccproxy] {message}");
     }
 
-    /// <summary>Logs an error message to stderr (always printed).</summary>
+    /// <summary>
+    /// Logs an error message to stderr (always printed).
+    /// </summary>
     public static void LogError(string message)
     {
         Console.Error.WriteLine($"[ccproxy] ERROR: {message}");
     }
 
-    /// <summary>Logs a request JSON payload to the log file (if initialized).</summary>
+    /// <summary>
+    /// Logs a request JSON payload to the log file (if initialized).
+    /// </summary>
     public static void LogRequest(string label, JsonNode? json)
     {
         if (fileWriter == null) return;
@@ -53,7 +61,9 @@ public static class Logger
         fileWriter.WriteLine(json?.ToJsonString(PrettyOptions) ?? "(null)");
     }
 
-    /// <summary>Logs a response JSON payload to the log file (if initialized).</summary>
+    /// <summary>
+    /// Logs a response JSON payload to the log file (if initialized).
+    /// </summary>
     public static void LogResponse(string label, JsonNode? json)
     {
         if (fileWriter == null) return;
@@ -61,7 +71,9 @@ public static class Logger
         fileWriter.WriteLine(json?.ToJsonString(PrettyOptions) ?? "(null)");
     }
 
-    /// <summary>Logs an SSE event to the log file (if initialized).</summary>
+    /// <summary>
+    /// Logs an SSE event to the log file (if initialized).
+    /// </summary>
     public static void LogSseEvent(string direction, string eventType, string data)
     {
         if (fileWriter == null) return;
@@ -82,7 +94,7 @@ public static class Logger
     /// </summary>
     public static void LogRequestSummary(string method, string path, int statusCode, string model, int toolCount, int toolUseCount, int messageCount)
     {
-        Console.Error.WriteLine($"[ccproxy] {method} {path} - {statusCode}");
+        Console.Error.WriteLine($"[ccproxy] {method} {path} HTTP/{statusCode}");
         Console.Error.WriteLine($"[ccproxy] {model} -> {toolCount} tools ({toolUseCount} invocations) {messageCount} messages");
     }
 }

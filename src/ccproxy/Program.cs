@@ -26,7 +26,6 @@ ShutdownEndpoint.Map(app);
 // Startup banner
 Logger.LogInfo($"CCProxy started on http://localhost:{config.Port}");
 Logger.LogInfo($"Target endpoint: {config.EndpointUrl}");
-Logger.LogInfo($"Target model: {config.Model}");
 if (config.LogFile != null)
     Logger.LogInfo($"Log file: {config.LogFile}");
 
