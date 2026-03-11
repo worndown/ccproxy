@@ -20,7 +20,7 @@ jobs:
           - rid: linux-arm64
             os: ubuntu-latest
           - rid: osx-x64
-            os: macos-13
+            os: macos-latest
           - rid: osx-arm64
             os: macos-latest
 
@@ -44,7 +44,7 @@ jobs:
         if: matrix.rid == 'linux-arm64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
       - name: Publish
         run: >
@@ -53,6 +53,7 @@ jobs:
           --runtime ${{ matrix.rid }}
           --output ./publish/${{ matrix.rid }}
           -p:Version=${{ steps.version.outputs.value }}
+          ${{ matrix.rid == 'linux-arm64' && '-p:ObjCopy=aarch64-linux-gnu-objcopy' || '' }}
 
       - name: Archive (Linux/macOS)
         if: runner.os != 'Windows'
