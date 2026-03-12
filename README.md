@@ -56,6 +56,15 @@ dotnet run --project src/ccproxy
 Configure Claude Code to route requests through CCProxy by setting the following environment variables:
 
 ```bash
+# Linux / macOS
+export ANTHROPIC_BASE_URL=http://localhost:5186
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5-nano
+export ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5-mini
+export ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5-codex
+```
+
+```cmd
+:: Windows
 set ANTHROPIC_BASE_URL=http://localhost:5186
 set ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5-nano
 set ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5-mini
@@ -63,7 +72,7 @@ set ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5-codex
 ```
 
 - `ANTHROPIC_BASE_URL` — Points Claude Code at the proxy instead of Anthropic's API.
-- `ANTHROPIC_DEFAULT_*_MODEL` — Maps Claude Code's model tiers (Haiku, Sonnet, Opus) to OpenAI model names. These are the model names that will be sent in requests to CCProxy and forwarded to the target API.
+- `ANTHROPIC_DEFAULT_*_MODEL` — Maps Claude Code's model tiers (Haiku, Sonnet, Opus) to OpenAI model names. These values are passed through as-is in every request to the target API, so they must exactly match a model name accepted by your OpenAI or Azure OpenAI deployment.
 
 Claude Code reads these variables on startup. From the Claude Code console, use the `/model` command to select the model tier (Haiku, Sonnet, or Opus). Claude Code will use the corresponding OpenAI model name when issuing requests.
 
@@ -174,12 +183,10 @@ ccproxy/
 │   ├── ccproxy.Tests.csproj            # xUnit test project
 │   ├── GlobalUsings.cs                 # Shared test usings
 │   ├── EndToEndTests.cs                # End-to-end endpoint and streaming tests
-│   └── Conversion/
-│       ├── AnthropicToOpenAITests.cs
-│       ├── OpenAIToAnthropicTests.cs
-│       └── StreamingStateTrackerTests.cs
-└── docs/
-    └── PRD.md                          # Product requirements
+    └── Conversion/
+        ├── AnthropicToOpenAITests.cs
+        ├── OpenAIToAnthropicTests.cs
+        └── StreamingStateTrackerTests.cs
 ```
 
 ## Testing
