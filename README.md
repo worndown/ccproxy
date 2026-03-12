@@ -33,6 +33,7 @@ https://<your_deployment>.cognitiveservices.azure.com/openai/responses?api-versi
 ```
 
 ## Quick Start
+Using command line parameters:
 
 ```bash
 # OpenAI
@@ -44,10 +45,21 @@ dotnet run --project src/ccproxy -- \
 dotnet run --project src/ccproxy -- \
   --endpoint https://your-deployment.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview \
   --key your-azure-api-key
+```
 
-# Or using environment variables
+Or using environment variables:
+
+```bash
+# Linux / macOS
 export CCPROXY_ENDPOINT_URL=https://api.openai.com/v1/responses
 export CCPROXY_API_KEY=your-api-key
+dotnet run --project src/ccproxy
+```
+
+```cmd
+rem Windows
+set CCPROXY_ENDPOINT_URL=https://api.openai.com/v1/responses
+set CCPROXY_API_KEY=your-api-key
 dotnet run --project src/ccproxy
 ```
 
@@ -64,7 +76,7 @@ export ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5-codex
 ```
 
 ```cmd
-:: Windows
+rem Windows
 set ANTHROPIC_BASE_URL=http://localhost:5186
 set ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5-nano
 set ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5-mini
@@ -180,9 +192,9 @@ ccproxy/
 │   └── Properties/
 │       └── launchSettings.json         # Local launch profile
 ├── tests/ccproxy.Tests/
-│   ├── ccproxy.Tests.csproj            # xUnit test project
-│   ├── GlobalUsings.cs                 # Shared test usings
-│   ├── EndToEndTests.cs                # End-to-end endpoint and streaming tests
+    ├── ccproxy.Tests.csproj            # xUnit test project
+    ├── GlobalUsings.cs                 # Shared test usings
+    ├── EndToEndTests.cs                # End-to-end endpoint and streaming tests
     └── Conversion/
         ├── AnthropicToOpenAITests.cs
         ├── OpenAIToAnthropicTests.cs
