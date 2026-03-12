@@ -146,7 +146,7 @@ public class EndToEndTests : IClassFixture<EndToEndTests.TestFactory>
         protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
         {
             // Set required env vars for config validation
-            Environment.SetEnvironmentVariable("CCPROXY_ENDPOINT_URL", "https://mock.openai.azure.com");
+            Environment.SetEnvironmentVariable("CCPROXY_ENDPOINT_URL", "https://mock.openai.azure.com/openai/responses?api-version=2025-03-01-preview");
             Environment.SetEnvironmentVariable("CCPROXY_API_KEY", "test-key");
 
             builder.ConfigureServices(services =>

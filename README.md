@@ -1,11 +1,13 @@
 # CCProxy
 
-A local proxy that enables Claude Code to use Azure-hosted OpenAI models. CCProxy translates between the Anthropic `/v1/messages` API and OpenAI's Responses API (`/v1/responses`), so Claude Code works seamlessly with models like GPT-5-Codex deployed on Azure.
+A local proxy that enables Claude Code to use OpenAI models, including those hosted on Azure. CCProxy translates between the Anthropic `/v1/messages` API and OpenAI's Responses API (`/v1/responses`), so Claude Code works seamlessly with OpenAI models like GPT-5-Codex.
+
+Only models that support the [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses) can be used with CCProxy.
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- An Azure OpenAI deployment with a Responses API-compatible model
+- An OpenAI API key, or an Azure OpenAI deployment with a Responses API-compatible model
 
 ## Configuration
 
@@ -14,36 +16,65 @@ CCProxy accepts configuration via command-line arguments or environment variable
 | CLI Argument   | Environment Variable   | Description                                  | Default |
 |----------------|------------------------|----------------------------------------------|---------|
 | `--port`       | `CCPROXY_PORT`         | Local port to listen on                      | `5186`  |
-| `--endpoint`   | `CCPROXY_ENDPOINT_URL` | Azure endpoint base URL                      | —       |
-| `--model`      | `CCPROXY_MODEL`        | Target Azure model deployment name           | —       |
-| `--key`        | `CCPROXY_API_KEY`      | Azure API key                                | —       |
+| `--endpoint`   | `CCPROXY_ENDPOINT_URL` | OpenAI or Azure OpenAI Responses API URL     | —       |
+| `--key`        | `CCPROXY_API_KEY`      | API key                                      | —       |
 | `--logfile`    | —                      | Path to verbose JSON log file (optional)     | —       |
+
+### Endpoint URL examples
+
+**OpenAI:**
+```
+https://api.openai.com/v1/responses
+```
+
+**Azure OpenAI:**
+```
+https://<your_deployment>.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview
+```
 
 ## Quick Start
 
 ```bash
-# Using CLI arguments
+# OpenAI
 dotnet run --project src/ccproxy -- \
-  --endpoint https://your-resource.openai.azure.com \
-  --model gpt-5-codex \
-  --key your-api-key
+  --endpoint https://api.openai.com/v1/responses \
+  --key your-openai-api-key
+
+# Azure OpenAI
+dotnet run --project src/ccproxy -- \
+  --endpoint https://your-deployment.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview \
+  --key your-azure-api-key
 
 # Or using environment variables
-export CCPROXY_ENDPOINT_URL=https://your-resource.openai.azure.com
-export CCPROXY_MODEL=gpt-5-codex
+export CCPROXY_ENDPOINT_URL=https://api.openai.com/v1/responses
 export CCPROXY_API_KEY=your-api-key
 dotnet run --project src/ccproxy
 ```
 
 ## Using with Claude Code
 
-Point Claude Code at the proxy by setting the base URL:
+Configure Claude Code to route requests through CCProxy by setting the following environment variables:
 
 ```bash
+# Linux / macOS
 export ANTHROPIC_BASE_URL=http://localhost:5186
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5-nano
+export ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5-mini
+export ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5-codex
 ```
 
-Then use Claude Code as usual. The proxy transparently converts requests to the OpenAI Responses API format and responses back to Anthropic format. The model name from Claude Code is echoed back in responses so Claude Code remains unaware of the underlying model.
+```cmd
+:: Windows
+set ANTHROPIC_BASE_URL=http://localhost:5186
+set ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5-nano
+set ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5-mini
+set ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5-codex
+```
+
+- `ANTHROPIC_BASE_URL` — Points Claude Code at the proxy instead of Anthropic's API.
+- `ANTHROPIC_DEFAULT_*_MODEL` — Maps Claude Code's model tiers (Haiku, Sonnet, Opus) to OpenAI model names. These values are passed through as-is in every request to the target API, so they must exactly match a model name accepted by your OpenAI or Azure OpenAI deployment.
+
+Claude Code reads these variables on startup. From the Claude Code console, use the `/model` command to select the model tier (Haiku, Sonnet, or Opus). Claude Code will use the corresponding OpenAI model name when issuing requests.
 
 ## How It Works
 
@@ -52,7 +83,7 @@ flowchart LR
     CC[Claude Code</br>Anthropic /v1/messages request]
     EP[ccproxy /v1/messages</br>MessagesEndpoint]
     A2O[AnthropicToOpenAI</br>request conversion]
-    AZ[Azure OpenAI</br>/v1/responses]
+    AZ[OpenAI</br>/v1/responses]
     O2A[OpenAIToAnthropic</br>response conversion]
     RESP[Anthropic-compatible</br>response]
 
@@ -67,11 +98,13 @@ flowchart LR
     RESP --> CC
 ```
 
+The proxy transparently converts requests to the OpenAI Responses API format and responses back to Anthropic format. The model name from the request is passed through to the target API and echoed back in responses.
+
 ## Endpoints
 
 ### POST `/v1/messages`
 
-Main proxy endpoint. Accepts Anthropic Messages API requests (both streaming and non-streaming), converts them to OpenAI Responses API format, forwards to Azure, and converts the response back.
+Main proxy endpoint. Accepts Anthropic Messages API requests (both streaming and non-streaming), converts them to OpenAI Responses API format, forwards to the configured endpoint, and converts the response back.
 
 ### POST `/shutdown`
 
@@ -90,8 +123,7 @@ For full verbose logging (JSON payloads and SSE events), use `--logfile` to writ
 
 ```bash
 dotnet run --project src/ccproxy -- \
-  --endpoint https://your-resource.openai.azure.com \
-  --model gpt-5-codex \
+  --endpoint https://api.openai.com/v1/responses \
   --key your-api-key \
   --logfile debug.log
 ```
@@ -102,7 +134,7 @@ dotnet run --project src/ccproxy -- \
 
 | Anthropic Field        | OpenAI Responses API Field |
 |------------------------|----------------------------|
-| `model`                | Configured `--model` value |
+| `model`                | `model` (pass-through)     |
 | `system`               | `instructions`             |
 | `messages`             | `input`                    |
 | `max_tokens`           | `max_output_tokens`        |
@@ -141,7 +173,7 @@ ccproxy/
 │   │   ├── OpenAIToAnthropic.cs        # OpenAI -> Anthropic response mapping
 │   │   └── StreamingStateTracker.cs    # Streaming event state machine
 │   ├── Proxy/
-│   │   ├── OpenAIProxy.cs              # Azure Responses API client
+│   │   ├── OpenAIProxy.cs              # Responses API client
 │   │   └── SseReader.cs                # SSE stream parser
 │   ├── Diagnostics/
 │   │   └── Logger.cs                   # Stderr summaries + optional file logging
@@ -151,12 +183,10 @@ ccproxy/
 │   ├── ccproxy.Tests.csproj            # xUnit test project
 │   ├── GlobalUsings.cs                 # Shared test usings
 │   ├── EndToEndTests.cs                # End-to-end endpoint and streaming tests
-│   └── Conversion/
-│       ├── AnthropicToOpenAITests.cs
-│       ├── OpenAIToAnthropicTests.cs
-│       └── StreamingStateTrackerTests.cs
-└── docs/
-    └── PRD.md                          # Product requirements
+    └── Conversion/
+        ├── AnthropicToOpenAITests.cs
+        ├── OpenAIToAnthropicTests.cs
+        └── StreamingStateTrackerTests.cs
 ```
 
 ## Testing
@@ -168,12 +198,12 @@ dotnet test
 # Manual non-streaming test
 curl -X POST http://localhost:5186/v1/messages \
   -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-20250514","max_tokens":100,"messages":[{"role":"user","content":"Say hello"}]}'
+  -d '{"model":"gpt-5-codex","max_tokens":100,"messages":[{"role":"user","content":"Say hello"}]}'
 
 # Manual streaming test
 curl -X POST http://localhost:5186/v1/messages --no-buffer \
   -H "Content-Type: application/json" \
-  -d '{"model":"claude-sonnet-4-20250514","max_tokens":100,"stream":true,"messages":[{"role":"user","content":"Say hello"}]}'
+  -d '{"model":"gpt-5-codex","max_tokens":100,"stream":true,"messages":[{"role":"user","content":"Say hello"}]}'
 ```
 
 ## License

@@ -25,12 +25,12 @@ public class OpenAIToAnthropicTests
         }
         """)!;
 
-        var result = OpenAIToAnthropic.Convert(response, "claude-sonnet-4-20250514");
+        var result = OpenAIToAnthropic.Convert(response, "gpt-5-codex");
 
         Assert.StartsWith("msg_", result["id"]!.GetValue<string>());
         Assert.Equal("message", result["type"]!.GetValue<string>());
         Assert.Equal("assistant", result["role"]!.GetValue<string>());
-        Assert.Equal("claude-sonnet-4-20250514", result["model"]!.GetValue<string>());
+        Assert.Equal("gpt-5-codex", result["model"]!.GetValue<string>());
         Assert.Equal("end_turn", result["stop_reason"]!.GetValue<string>());
 
         var content = result["content"]!.AsArray();
@@ -171,7 +171,7 @@ public class OpenAIToAnthropicTests
     }
 
     [Fact]
-    public void Convert_WithRequestedModel_ReturnsRequestedModel()
+    public void Convert_ReturnsRequestedModel()
     {
         var response = JsonNode.Parse("""
         {
@@ -185,5 +185,4 @@ public class OpenAIToAnthropicTests
         var result = OpenAIToAnthropic.Convert(response, "claude-sonnet-4-20250514");
         Assert.Equal("claude-sonnet-4-20250514", result["model"]!.GetValue<string>());
     }
-
 }

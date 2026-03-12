@@ -66,8 +66,15 @@ public static class MessagesEndpoint
             }
 
             bool isStreaming = requestBody["stream"]?.GetValue<bool>() ?? false;
-            string requestedModel = requestBody["model"]?.GetValue<string>() ?? "unknown";
-            int toolCount = requestBody["tools"]?.AsArray()?.Count ?? 0;
+            string? requestedModel = requestBody["model"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(requestedModel))
+            {
+                context.Response.StatusCode = 400;
+                await WriteJsonResponse(context, CreateError("invalid_request_error", "model is required"));
+                return;
+            }
+
+            int toolCount = requestBody["tools"]?.AsArray().Count ?? 0;
             int messageCount = messages.Count;
             int summaryStatusCode = 200;
             int toolUseCount = 0;
@@ -129,7 +136,7 @@ public static class MessagesEndpoint
 
     private static async Task<int> HandleNonStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, string requestedModel)
     {
-        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, stream: false);
+        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, requestedModel, stream: false);
         JsonNode? openAiResponse = await proxy.SendRequestAsync(openAiRequest, context.RequestAborted);
 
         if (openAiResponse == null)
@@ -153,7 +160,7 @@ public static class MessagesEndpoint
 
     private static async Task<int> HandleStreaming(HttpContext context, JsonNode requestBody, OpenAIProxy proxy, string requestedModel)
     {
-        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, stream: true);
+        JsonObject openAiRequest = AnthropicToOpenAI.Convert(requestBody, requestedModel, stream: true);
         (Stream stream, _) = await proxy.SendStreamingRequestAsync(openAiRequest, context.RequestAborted);
 
         context.Response.ContentType = "text/event-stream";

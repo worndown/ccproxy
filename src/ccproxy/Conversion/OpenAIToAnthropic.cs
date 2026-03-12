@@ -12,7 +12,7 @@ public static class OpenAIToAnthropic
     /// Converts an OpenAI Responses API response into an Anthropic <c>/v1/messages</c> response.
     /// </summary>
     /// <param name="openAiResponse">The OpenAI response JSON.</param>
-    /// <param name="requestedModel">The model name from the original Anthropic request, echoed back in the response.</param>
+    /// <param name="requestedModel">The model name from the original request, echoed back in the response.</param>
     /// <returns>An Anthropic Messages API response as a <see cref="JsonObject"/>.</returns>
     public static JsonObject Convert(JsonNode openAiResponse, string requestedModel)
     {
