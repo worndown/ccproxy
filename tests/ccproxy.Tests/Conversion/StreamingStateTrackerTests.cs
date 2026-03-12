@@ -9,7 +9,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_ResponseCreated_EmitsMessageStart()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
         var events = tracker.ProcessEvent(new SseEvent("response.created", """
         {
             "id": "resp_1",
@@ -21,13 +21,13 @@ public class StreamingStateTrackerTests
         Assert.Equal("message_start", events[0].EventType);
         var msg = events[0].Data["message"]!;
         Assert.Equal("assistant", msg["role"]!.GetValue<string>());
-        Assert.Equal("test-model", msg["model"]!.GetValue<string>());
+        Assert.Equal("gpt-5-codex", msg["model"]!.GetValue<string>());
     }
 
     [Fact]
     public void ProcessEvent_TextStreaming_EmitsCorrectSequence()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
 
         // content_part.added (output_text)
         var addedEvents = tracker.ProcessEvent(new SseEvent("response.content_part.added", """
@@ -71,7 +71,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_FunctionCallStreaming_EmitsToolUseBlocks()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
 
         // output_item.added (function_call)
         var addedEvents = tracker.ProcessEvent(new SseEvent("response.output_item.added", """
@@ -127,7 +127,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_Completed_EmitsMessageDeltaAndStop()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
 
         var events = tracker.ProcessEvent(new SseEvent("response.completed", """
         {
@@ -149,7 +149,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_CompletedWithToolUse_StopReasonIsToolUse()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
 
         // First add a function call to set the hasToolUse flag
         tracker.ProcessEvent(new SseEvent("response.output_item.added", """
@@ -174,7 +174,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_IncompleteStatus_StopReasonIsMaxTokens()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
 
         var events = tracker.ProcessEvent(new SseEvent("response.completed", """
         {
@@ -191,7 +191,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_TextThenToolThenText_AssignsDistinctBlockIndices()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
 
         // First text block at output_index=0
         var text1Events = tracker.ProcessEvent(new SseEvent("response.content_part.added", """
@@ -236,7 +236,7 @@ public class StreamingStateTrackerTests
     [Fact]
     public void ProcessEvent_UnknownEvent_ReturnsEmpty()
     {
-        var tracker = new StreamingStateTracker("test-model");
+        var tracker = new StreamingStateTracker("gpt-5-codex");
         var events = tracker.ProcessEvent(new SseEvent("response.unknown", "{}")).ToList();
         Assert.Empty(events);
     }

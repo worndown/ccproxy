@@ -13,13 +13,14 @@ public static class AnthropicToOpenAI
     /// The model name from the Anthropic request is passed through as-is.
     /// </summary>
     /// <param name="anthropicRequest">The incoming Anthropic request JSON.</param>
+    /// <param name="model">The model name to use in the outbound request.</param>
     /// <param name="stream">Whether to set <c>"stream": true</c> on the outbound request.</param>
     /// <returns>An OpenAI Responses API request as a <see cref="JsonObject"/>.</returns>
-    public static JsonObject Convert(JsonNode anthropicRequest, bool stream = false)
+    public static JsonObject Convert(JsonNode anthropicRequest, string model, bool stream = false)
     {
         JsonObject result = new JsonObject
         {
-            ["model"] = anthropicRequest["model"]?.DeepClone(),
+            ["model"] = model
         };
 
         // reasoning -> high

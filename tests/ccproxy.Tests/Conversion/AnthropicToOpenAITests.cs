@@ -5,6 +5,7 @@ namespace CCProxy.Tests.Conversion;
 
 public class AnthropicToOpenAITests
 {
+
     [Fact]
     public void Convert_SimpleTextMessage_MapsCorrectly()
     {
@@ -18,7 +19,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "claude-sonnet-4-20250514");
 
         Assert.Equal("claude-sonnet-4-20250514", result["model"]!.GetValue<string>());
         Assert.Equal(1024, result["max_output_tokens"]!.GetValue<int>());
@@ -31,7 +32,7 @@ public class AnthropicToOpenAITests
     }
 
     [Fact]
-    public void Convert_PassesThroughModel()
+    public void Convert_UsesProvidedModel()
     {
         var request = JsonNode.Parse("""
         {
@@ -41,8 +42,8 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
-        Assert.Equal("claude-opus-4-20250514", result["model"]!.GetValue<string>());
+        var result = AnthropicToOpenAI.Convert(request, "gpt-4o");
+        Assert.Equal("gpt-4o", result["model"]!.GetValue<string>());
     }
 
     [Fact]
@@ -57,7 +58,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         Assert.Equal("You are helpful", result["instructions"]!.GetValue<string>());
     }
 
@@ -73,7 +74,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         Assert.Equal("Part 1\nPart 2", result["instructions"]!.GetValue<string>());
     }
 
@@ -90,7 +91,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         Assert.Equal(0.7, result["temperature"]!.GetValue<double>(), 0.001);
         Assert.Equal(0.9, result["top_p"]!.GetValue<double>(), 0.001);
     }
@@ -110,7 +111,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         var input = result["input"]!.AsArray();
         Assert.Equal(3, input.Count);
         Assert.Equal("user", input[0]!["role"]!.GetValue<string>());
@@ -140,7 +141,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         var tools = result["tools"]!.AsArray();
         Assert.Single(tools);
         Assert.Equal("function", tools[0]!["type"]!.GetValue<string>());
@@ -161,7 +162,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         Assert.Equal("auto", result["tool_choice"]!.GetValue<string>());
     }
 
@@ -177,7 +178,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         Assert.Equal("required", result["tool_choice"]!.GetValue<string>());
     }
 
@@ -193,7 +194,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         var tc = result["tool_choice"]!;
         Assert.Equal("function", tc["type"]!.GetValue<string>());
         Assert.Equal("get_weather", tc["name"]!.GetValue<string>());
@@ -219,7 +220,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         var input = result["input"]!.AsArray();
 
         // Should have: user message, assistant text, function_call, function_call_output
@@ -258,7 +259,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         var input = result["input"]!.AsArray();
         var content = input[0]!["content"]!.AsArray();
         Assert.Equal(2, content.Count);
@@ -286,7 +287,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request);
+        var result = AnthropicToOpenAI.Convert(request, "test-model");
         var input = result["input"]!.AsArray();
         Assert.Equal("function_call_output", input[0]!["type"]!.GetValue<string>());
         Assert.Equal("Line 1\nLine 2", input[0]!["output"]!.GetValue<string>());
@@ -303,7 +304,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, stream: true);
+        var result = AnthropicToOpenAI.Convert(request, "test-model", stream: true);
         Assert.True(result["stream"]!.GetValue<bool>());
     }
 
@@ -318,7 +319,7 @@ public class AnthropicToOpenAITests
         }
         """)!;
 
-        var result = AnthropicToOpenAI.Convert(request, stream: false);
+        var result = AnthropicToOpenAI.Convert(request, "test-model", stream: false);
         Assert.Null(result["stream"]);
     }
 }
