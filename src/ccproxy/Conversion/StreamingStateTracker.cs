@@ -12,9 +12,6 @@ public class StreamingStateTracker
 {
     private readonly string messageId = $"msg_{Guid.NewGuid():N}";
     private readonly string requestedModel;
-    private readonly Dictionary<string, int> outputItemToBlockIndex = new();
-    private readonly Dictionary<(int OutputIndex, int ContentIndex), int> contentPartToBlockIndex = new();
-    private int contentBlockIndex = 0;
     private bool hasToolUse = false;
 
     /// <summary>
@@ -28,11 +25,8 @@ public class StreamingStateTracker
 
     /// <summary>
     /// Gets the number of tool invocations seen so far in this streaming response.
-    /// Incremented by <see cref="HandleOutputItemAdded"/> each time a <c>response.output_item.added</c>
-    /// event with <c>type == "function_call"</c> adds an entry to <see cref="outputItemToBlockIndex"/>.
-    /// Read after the stream loop completes to get the final count.
     /// </summary>
-    public int ToolUseCount => this.outputItemToBlockIndex.Count;
+    public int ToolUseCount { get; private set; }
 
     /// <summary>
     /// Processes a single OpenAI SSE event and yields zero or more corresponding Anthropic SSE events.
@@ -41,6 +35,7 @@ public class StreamingStateTracker
     {
         string eventType = sseEvent.EventType;
         JsonNode? data;
+
         try
         {
             data = JsonNode.Parse(sseEvent.Data);
@@ -58,40 +53,44 @@ public class StreamingStateTracker
         switch (eventType)
         {
             case "response.created":
-                yield return ("message_start", CreateMessageStart());
+                yield return ("message_start", this.CreateMessageStart());
                 break;
 
             case "response.output_item.added":
-                foreach ((string, JsonObject) e in HandleOutputItemAdded(data))
-                    yield return e;
-                break;
-
-            case "response.content_part.added":
-                foreach ((string, JsonObject) e in HandleContentPartAdded(data))
-                    yield return e;
-                break;
-
-            case "response.output_text.delta":
-                yield return ("content_block_delta", CreateTextDelta(data));
-                break;
-
-            case "response.function_call_arguments.delta":
-                yield return ("content_block_delta", CreateInputJsonDelta(data));
-                break;
-
-            case "response.content_part.done":
-                foreach ((string, JsonObject) e in HandleContentPartDone(data))
+                foreach ((string, JsonObject) e in this.HandleOutputItemAdded(data))
                     yield return e;
                 break;
 
             case "response.output_item.done":
-                foreach ((string, JsonObject) e in HandleOutputItemDone(data))
+                foreach ((string, JsonObject) e in this.HandleOutputItemDone(data))
+                    yield return e;
+                break;
+
+            case "response.content_part.added":
+                foreach ((string, JsonObject) e in this.HandleContentPartAdded(data))
+                    yield return e;
+                break;
+
+            case "response.output_text.delta":
+                yield return ("content_block_delta", this.CreateTextDelta(data));
+                break;
+
+            case "response.function_call_arguments.delta":
+                yield return ("content_block_delta", this.CreateFunctionCallInputDelta(data));
+                break;
+
+            case "response.content_part.done":
+                foreach ((string, JsonObject) e in this.HandleContentPartDone(data))
                     yield return e;
                 break;
 
             case "response.completed":
-                foreach ((string, JsonObject) e in HandleCompleted(data))
+                foreach ((string, JsonObject) e in this.HandleCompleted(data))
                     yield return e;
+                break;
+
+            default:
+                Console.WriteLine($"========== {eventType} ==========");
                 break;
         }
     }
@@ -111,8 +110,6 @@ public class StreamingStateTracker
                 ["role"] = "assistant",
                 ["model"] = this.requestedModel,
                 ["content"] = new JsonArray(),
-                ["stop_reason"] = null,
-                ["stop_sequence"] = null,
                 ["usage"] = new JsonObject
                 {
                     ["input_tokens"] = 0,
@@ -130,8 +127,12 @@ public class StreamingStateTracker
     /// </summary>
     private IEnumerable<(string, JsonObject)> HandleOutputItemAdded(JsonNode data)
     {
+        int blockIndex = data["output_index"]?.GetValue<int>() ?? 0;
         JsonNode? item = data["item"];
-        if (item == null) yield break;
+        if (item == null)
+        {
+            yield break;
+        }
 
         string? type = item["type"]?.GetValue<string>();
         string itemId = item["id"]?.GetValue<string>() ?? "";
@@ -139,19 +140,31 @@ public class StreamingStateTracker
         if (type == "function_call")
         {
             this.hasToolUse = true;
-            int index = this.contentBlockIndex++;
-            this.outputItemToBlockIndex[itemId] = index;
 
             yield return ("content_block_start", new JsonObject
             {
                 ["type"] = "content_block_start",
-                ["index"] = index,
+                ["index"] = blockIndex,
                 ["content_block"] = new JsonObject
                 {
                     ["type"] = "tool_use",
                     ["id"] = item["call_id"]?.DeepClone() ?? JsonValue.Create(""),
                     ["name"] = item["name"]?.DeepClone() ?? JsonValue.Create(""),
                     ["input"] = new JsonObject()
+                }
+            });
+        }
+        else if (type == "reasoning")
+        {
+            yield return ("content_block_start", new JsonObject
+            {
+                ["type"] = "content_block_start",
+                ["index"] = blockIndex,
+                ["content_block"] = new JsonObject
+                {
+                    ["type"] = "thinking",
+                    ["signature"] = item["id"]?.GetValue<string>() ?? "",
+                    ["thinking"] = ""
                 }
             });
         }
@@ -164,20 +177,23 @@ public class StreamingStateTracker
     private IEnumerable<(string, JsonObject)> HandleContentPartAdded(JsonNode data)
     {
         JsonNode? part = data["part"];
-        if (part == null) yield break;
+
+        if (part == null)
+        {
+            yield break;
+        }
 
         string? type = part["type"]?.GetValue<string>();
         if (type == "output_text")
         {
-            int index = this.contentBlockIndex++;
+            int blockIndex = data["output_index"]?.GetValue<int>() ?? 0;
             int outputIndex = data["output_index"]?.GetValue<int>() ?? 0;
             int contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
-            this.contentPartToBlockIndex[(outputIndex, contentIndex)] = index;
 
             yield return ("content_block_start", new JsonObject
             {
                 ["type"] = "content_block_start",
-                ["index"] = index,
+                ["index"] = blockIndex,
                 ["content_block"] = new JsonObject
                 {
                     ["type"] = "text",
@@ -192,7 +208,8 @@ public class StreamingStateTracker
     /// </summary>
     private JsonObject CreateTextDelta(JsonNode data)
     {
-        int blockIndex = FindTextBlockIndex(data);
+        int blockIndex = data["output_index"]?.GetValue<int>() ?? 0;
+        //int blockIndex = this.FindTextBlockIndex(data);
 
         return new JsonObject
         {
@@ -210,11 +227,12 @@ public class StreamingStateTracker
     /// Creates a <c>content_block_delta</c> with an <c>input_json_delta</c> payload from a
     /// <c>response.function_call_arguments.delta</c> event.
     /// </summary>
-    private JsonObject CreateInputJsonDelta(JsonNode data)
+    private JsonObject CreateFunctionCallInputDelta(JsonNode data)
     {
         string itemId = data["item_id"]?.GetValue<string>() ?? "";
-        int blockIndex = this.outputItemToBlockIndex.GetValueOrDefault(itemId, 0);
-
+        string delta = data["delta"]?.DeepClone().GetValue<string>() ?? "";
+        int blockIndex = data["output_index"]?.GetValue<int>() ?? 0;
+        
         return new JsonObject
         {
             ["type"] = "content_block_delta",
@@ -222,7 +240,7 @@ public class StreamingStateTracker
             ["delta"] = new JsonObject
             {
                 ["type"] = "input_json_delta",
-                ["partial_json"] = data["delta"]?.DeepClone() ?? JsonValue.Create("")
+                ["partial_json"] = delta
             }
         };
     }
@@ -232,7 +250,7 @@ public class StreamingStateTracker
     /// </summary>
     private IEnumerable<(string, JsonObject)> HandleContentPartDone(JsonNode data)
     {
-        int blockIndex = FindTextBlockIndex(data);
+        int blockIndex = data["output_index"]?.GetValue<int>() ?? 0;
         yield return ("content_block_stop", new JsonObject
         {
             ["type"] = "content_block_stop",
@@ -245,19 +263,45 @@ public class StreamingStateTracker
     /// </summary>
     private IEnumerable<(string, JsonObject)> HandleOutputItemDone(JsonNode data)
     {
-        JsonNode? item = data["item"];
-        if (item == null) yield break;
-
-        string? type = item["type"]?.GetValue<string>();
-        if (type == "function_call")
+        yield return ("content_block_stop", new JsonObject
         {
-            string itemId = item["id"]?.GetValue<string>() ?? "";
-            int blockIndex = this.outputItemToBlockIndex.GetValueOrDefault(itemId, 0);
+            ["type"] = "content_block_stop",
+            ["index"] = data["output_index"]?.GetValue<int>() ?? 0
+        });
 
-            yield return ("content_block_stop", new JsonObject
+        JsonNode? item = data["item"];
+        if (item == null)
+        {
+            yield break;
+        }
+
+        string itemType = item["type"]?.GetValue<string>() ?? "";
+        string status = item["status"]?.GetValue<string>() ?? "";
+
+        if (itemType == "function_call" && status == "completed")
+        {
+            this.ToolUseCount++;
+
+            JsonNode? functionArgs = null;
+            JsonNode? argumentsNode = item["arguments"];
+
+            if (argumentsNode is JsonValue value &&
+                value.TryGetValue<string>(out string? jsonText) &&
+                !string.IsNullOrWhiteSpace(jsonText))
             {
-                ["type"] = "content_block_stop",
-                ["index"] = blockIndex
+                functionArgs = JsonNode.Parse(jsonText);
+            }
+            else
+            {
+                functionArgs = argumentsNode?.DeepClone();
+            }
+
+            yield return ("tool_use", new JsonObject
+            {
+                ["type"] = "tool_use",
+                ["id"] = item["call_id"]?.GetValue<string>(),
+                ["name"] = item["name"]?.GetValue<string>() ?? "",
+                ["input"] = functionArgs
             });
         }
     }
@@ -288,6 +332,7 @@ public class StreamingStateTracker
             },
             ["usage"] = new JsonObject
             {
+                ["input_tokens"] = inputTokens,
                 ["output_tokens"] = outputTokens
             }
         });
@@ -296,18 +341,5 @@ public class StreamingStateTracker
         {
             ["type"] = "message_stop"
         });
-    }
-
-    /// <summary>
-    /// Resolves the Anthropic content block index for a text-related event using its
-    /// <c>output_index</c> and <c>content_index</c> fields.
-    /// </summary>
-    private int FindTextBlockIndex(JsonNode data)
-    {
-        int outputIndex = data["output_index"]?.GetValue<int>() ?? 0;
-        int contentIndex = data["content_index"]?.GetValue<int>() ?? 0;
-        (int outputIndex, int contentIndex) key = (outputIndex, contentIndex);
-
-        return this.contentPartToBlockIndex.GetValueOrDefault(key, contentIndex); // fallback for safety
     }
 }

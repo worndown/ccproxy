@@ -21,7 +21,10 @@ public static class SseReader
         while (!cancellationToken.IsCancellationRequested)
         {
             string? line = await reader.ReadLineAsync(cancellationToken);
-            if (line == null) break; // End of stream
+            if (line == null)
+            {
+                break; // End of stream
+            }
 
             if (line.StartsWith("event:"))
             {
