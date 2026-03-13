@@ -31,6 +31,9 @@ public static class AnthropicToOpenAI
             ["effort"] = "high"
         };
 
+        // Whether to store the generated model response for later retrieval via API.
+        result["store"] = false;
+
         // max_tokens -> max_output_tokens
         if (anthropicRequest["max_tokens"] is { } maxTokens)
         {
@@ -75,6 +78,11 @@ public static class AnthropicToOpenAI
         if (stream)
         {
             result["stream"] = true;
+
+            result["stream_options"] = new JsonObject
+            {
+                ["include_obfuscation"] = false
+            };
         }
 
         return result;
