@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using CCProxy.Proxy;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace CCProxy.Tests;
 

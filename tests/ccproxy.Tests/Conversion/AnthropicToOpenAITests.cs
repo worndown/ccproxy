@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using CCProxy.Conversion;
+using Xunit;
 
 namespace CCProxy.Tests.Conversion;
 
