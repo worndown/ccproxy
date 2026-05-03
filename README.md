@@ -88,30 +88,6 @@ set ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5-codex
 
 Claude Code reads these variables on startup. From the Claude Code console, use the `/model` command to select the model tier (Haiku, Sonnet, or Opus). Claude Code will use the corresponding OpenAI model name when issuing requests.
 
-## How It Works
-
-```mermaid
-flowchart LR
-    CC[Claude Code</br>Anthropic /v1/messages request]
-    EP[ccproxy /v1/messages</br>MessagesEndpoint]
-    A2O[AnthropicToOpenAI</br>request conversion]
-    AZ[OpenAI</br>/v1/responses]
-    O2A[OpenAIToAnthropic</br>response conversion]
-    RESP[Anthropic-compatible</br>response]
-
-    CC --> EP --> A2O --> AZ --> O2A --> RESP
-
-    subgraph Streaming Path
-        SSE[SseReader parses SSE]
-        SST[StreamingStateTracker</br>builds Anthropic stream events]
-        AZ --> SSE --> SST --> RESP
-    end
-
-    RESP --> CC
-```
-
-The proxy transparently converts requests to the OpenAI Responses API format and responses back to Anthropic format. The model name from the request is passed through to the target API and echoed back in responses.
-
 ## Endpoints
 
 ### POST `/v1/messages`
@@ -138,67 +114,6 @@ dotnet run --project src/ccproxy -- \
   --endpoint https://api.openai.com/v1/responses \
   --key your-api-key \
   --logfile debug.log
-```
-
-## API Conversion Reference
-
-### Request Mapping (Anthropic → OpenAI)
-
-| Anthropic Field        | OpenAI Responses API Field |
-|------------------------|----------------------------|
-| `model`                | `model` (pass-through)     |
-| `system`               | `instructions`             |
-| `messages`             | `input`                    |
-| `max_tokens`           | `max_output_tokens`        |
-| `temperature`, `top_p` | Pass through               |
-| `tools`                | `tools` (function type)    |
-| `tool_choice`          | `tool_choice`              |
-| `stream`               | `stream`                   |
-
-### Response Mapping (OpenAI → Anthropic)
-
-| OpenAI Field                | Anthropic Field              |
-|-----------------------------|------------------------------|
-| `output[].message`          | `content[].text`             |
-| `output[].function_call`    | `content[].tool_use`         |
-| `status: "completed"`       | `stop_reason: "end_turn"`    |
-| `status: "incomplete"`      | `stop_reason: "max_tokens"`  |
-| Any function_call in output | `stop_reason: "tool_use"`    |
-| `usage`                     | `usage` (direct mapping)     |
-
-## Project Structure
-
-```
-ccproxy/
-├── ccproxy.sln                         # Solution file
-├── src/ccproxy/
-│   ├── Program.cs                      # App bootstrap and DI wiring
-│   ├── ccproxy.csproj                  # ASP.NET Core proxy project
-│   ├── appsettings.json                # Default ASP.NET logging config
-│   ├── Configuration/
-│   │   └── ProxyConfig.cs              # CLI/env config parsing and validation
-│   ├── Endpoints/
-│   │   ├── MessagesEndpoint.cs         # /v1/messages handler
-│   │   └── ShutdownEndpoint.cs         # /shutdown handler
-│   ├── Conversion/
-│   │   ├── AnthropicToOpenAI.cs        # Anthropic -> OpenAI request mapping
-│   │   ├── OpenAIToAnthropic.cs        # OpenAI -> Anthropic response mapping
-│   │   └── StreamingStateTracker.cs    # Streaming event state machine
-│   ├── Proxy/
-│   │   ├── OpenAIProxy.cs              # Responses API client
-│   │   └── SseReader.cs                # SSE stream parser
-│   ├── Diagnostics/
-│   │   └── Logger.cs                   # Stderr summaries + optional file logging
-│   └── Properties/
-│       └── launchSettings.json         # Local launch profile
-├── tests/ccproxy.Tests/
-    ├── ccproxy.Tests.csproj            # xUnit test project
-    ├── GlobalUsings.cs                 # Shared test usings
-    ├── EndToEndTests.cs                # End-to-end endpoint and streaming tests
-    └── Conversion/
-        ├── AnthropicToOpenAITests.cs
-        ├── OpenAIToAnthropicTests.cs
-        └── StreamingStateTrackerTests.cs
 ```
 
 ## Testing

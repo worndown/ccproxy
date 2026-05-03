@@ -1,5 +1,6 @@
 using CCProxy.Conversion;
 using CCProxy.Proxy;
+using Xunit;
 
 namespace CCProxy.Tests.Conversion;
 
